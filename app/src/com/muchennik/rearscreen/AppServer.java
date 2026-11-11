@@ -50,16 +50,19 @@ public final class AppServer {
     private static Method injectMethod, setDisplayId;
     private static int displayId;
     private static long downTime;
+    private static boolean imeLocal;
+    private static volatile String current; // app shown on the rear display (null = rear launcher)
 
     public static void main(String[] args) throws Exception {
-        if (args.length == 2 && "--tweak".equals(args[0])) {
+        if (args.length >= 2 && "--tweak".equals(args[0])) {
             // second pass as root (uid 0 passes the permission checks shell fails)
             displayId = Integer.parseInt(args[1]);
+            imeLocal = args.length > 2 && "local".equals(args[2]);
             windowManagerTweaks();
             return;
         }
-        String pkg = args.length > 0 ? args[0] : "com.android.chrome";
-        boolean imeLocal = args.length < 2 || "local".equals(args[1]);
+        current = args.length > 0 && !"-".equals(args[0]) ? args[0] : null;
+        imeLocal = args.length < 2 || "local".equals(args[1]);
         int dpi = args.length > 2 ? Integer.parseInt(args[2]) : 140;
 
         Looper.prepareMainLooper();
@@ -121,12 +124,14 @@ public final class AppServer {
         log("I settings: force_desktop=" + shOut("settings get global force_desktop_mode_on_external_displays").trim()
                 + " freeform=" + shOut("settings get global enable_freeform_support").trim());
         initInput();
-        launch(pkg);
+        if (current != null) launch(current);
 
         // relaunch the app if it gets closed (it would leave the rear screen black)
         Thread watch = new Thread(() -> {
             while (true) {
                 try { Thread.sleep(3000); } catch (InterruptedException e) { return; }
+                String pkg = current;
+                if (pkg == null) continue;
                 String tasks = shOut("am stack list");
                 if (!tasks.contains("displayId=" + displayId)) {
                     log("I app closed, relaunching");
@@ -147,7 +152,8 @@ public final class AppServer {
                         case "M": touch(MotionEvent.ACTION_MOVE, s); break;
                         case "U": touch(MotionEvent.ACTION_UP, s); break;
                         case "KEY": key(Integer.parseInt(s[1])); break;
-                        case "LAUNCH": launch(s[1]); break;
+                        case "LAUNCH": current = s[1]; launch(s[1]); break;
+                        case "MENU": current = null; break;
                         case "QUIT": l = null; break;
                         default: break;
                     }
@@ -205,7 +211,8 @@ public final class AppServer {
             return;
         }
         call(wm, "setShouldShowSystemDecors", displayId, false);   // no nav bar / launcher / gestures
-        call(wm, "setDisplayImePolicy", displayId, 1);              // DISPLAY_IME_POLICY_FALLBACK_DISPLAY
+        // LOCAL (0): our own rear keyboard opens on the rear display; FALLBACK (1): main screen
+        call(wm, "setDisplayImePolicy", displayId, imeLocal ? 0 : 1);
         call(wm, "setWindowingMode", displayId, 1);                 // WINDOWING_MODE_FULLSCREEN
     }
 

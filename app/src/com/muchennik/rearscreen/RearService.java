@@ -31,7 +31,8 @@ import java.util.List;
  */
 public class RearService extends Service {
     static final String ACTION_START = "start", ACTION_STOP = "stop", ACTION_BRIGHTNESS = "bl",
-            ACTION_BACK = "back", ACTION_HOME = "home";
+            ACTION_BACK = "back", ACTION_HOME = "home", ACTION_MENU = "menu";
+    static final String IME = "com.muchennik.rearscreen/.RearIme";
     private static final String TAG = Root.TAG;
     private static final int NOTIF = 1;
 
@@ -51,6 +52,11 @@ public class RearService extends Service {
     private Process appProc;          // AppServer (virtual display) in app mode
     private OutputStream appCmd;
     private volatile boolean appMode;
+    private volatile boolean inLauncher = true; // app mode: grid of icons (true) or the app
+    private volatile Launcher launcher;
+    private final byte[] lastAppFrame = new byte[Frames.SIZE];
+    private volatile boolean haveAppFrame;
+    private final Object frameLock = new Object();
 
     private final BroadcastReceiver screen = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
@@ -69,6 +75,13 @@ public class RearService extends Service {
             stopAll();
         } else if (ACTION_BACK.equals(a) || ACTION_HOME.equals(a)) {
             appCommand("KEY " + (ACTION_BACK.equals(a) ? 4 : 3));
+        } else if (ACTION_MENU.equals(a)) {
+            if (running && appMode) {
+                appCommand("MENU");
+                launcher = new Launcher(this, prefs.apps()); // list may have been edited
+                inLauncher = true;
+                wake();
+            }
         } else if (ACTION_BRIGHTNESS.equals(a)) {
             if (running && awake) backlight(prefs.brightness());
         } else if (!running) {
@@ -99,7 +112,10 @@ public class RearService extends Service {
                 appMode = prefs.mode() == Prefs.MODE_APP;
                 wake();
                 if (appMode) startApp();
-                else {
+                else if (prefs.mode() == Prefs.MODE_VIS) {
+                    renderThread = new Thread(this::visLoop, "rear-vis");
+                    renderThread.start();
+                } else {
                     renderThread = new Thread(this::renderLoop, "rear-render");
                     renderThread.start();
                 }
@@ -126,7 +142,12 @@ public class RearService extends Service {
                 String l;
                 while ((l = r.readLine()) != null) {
                     if (appMode && (l.startsWith("D ") || l.startsWith("M ") || l.startsWith("U "))) {
-                        if (awake) appCommand(l);
+                        if (awake && inLauncher) {
+                            awakeSince = SystemClock.uptimeMillis(); // touching keeps it on
+                            Launcher la = launcher;
+                            String open = la != null ? la.touch(l) : null;
+                            if (open != null) openApp(open);
+                        } else if (awake) appCommand(l);
                         else if (l.startsWith("U ")) onTap(0, 0); // wake rules still apply
                         continue;
                     }
@@ -166,6 +187,87 @@ public class RearService extends Service {
         }
     }
 
+    private void writeFrame(byte[] f) throws java.io.IOException {
+        synchronized (frameLock) {
+            frames.write(f);
+            frames.flush();
+        }
+    }
+
+    private void openApp(String pkg) {
+        inLauncher = false;
+        appCommand("LAUNCH " + pkg);
+        if (haveAppFrame) try { writeFrame(lastAppFrame); } catch (Exception ignored) {}
+    }
+
+    /** Spectrum mode: microphone or phone output as bars. */
+    private void visLoop() {
+        byte[] frame = new byte[Frames.SIZE];
+        byte[] black = new byte[Frames.SIZE];
+        VisSource v = null;
+        boolean blackSent = false;
+        try {
+            while (running) {
+                if (awake && prefs.offMode() == Prefs.OFF_TIMER
+                        && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
+                if (!awake) {
+                    if (v != null) { v.close(); v = null; }
+                    if (!blackSent) { writeFrame(black); blackSent = true; }
+                    Thread.sleep(100);
+                    continue;
+                }
+                blackSent = false;
+                if (v == null) {
+                    try {
+                        v = new VisSource(prefs.visSource(), prefs.visStyle(), prefs.visSensitivity());
+                    } catch (Exception e) {
+                        Log.e(TAG, "vis", e);
+                        toast("Эквалайзер: " + e.getMessage());
+                        main.post(this::stopAll);
+                        return;
+                    }
+                }
+                v.render(frame);
+                writeFrame(frame);
+                int d = v.delayMs();
+                if (d > 0) Thread.sleep(d);
+            }
+        } catch (Exception e) {
+            if (running) Log.e(TAG, "vis loop", e);
+        } finally {
+            if (v != null) v.close();
+        }
+    }
+
+    /** App mode, grid state: draws the icon grid when something changed. */
+    private void launcherLoop() {
+        byte[] frame = new byte[Frames.SIZE];
+        byte[] black = new byte[Frames.SIZE];
+        boolean blackSent = false, wasLauncher = false;
+        try {
+            while (running) {
+                if (awake && prefs.offMode() == Prefs.OFF_TIMER
+                        && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
+                Launcher la = launcher;
+                if (!inLauncher || la == null) { wasLauncher = false; Thread.sleep(50); continue; }
+                if (!awake) {
+                    if (!blackSent) { writeFrame(black); blackSent = true; }
+                    Thread.sleep(100);
+                    continue;
+                }
+                if (la.dirty || blackSent || !wasLauncher) {
+                    la.render(frame);
+                    writeFrame(frame);
+                }
+                blackSent = false;
+                wasLauncher = true;
+                Thread.sleep(30);
+            }
+        } catch (Exception e) {
+            if (running) Log.e(TAG, "launcher", e);
+        }
+    }
+
     private void wake() {
         awake = true;
         awakeSince = SystemClock.uptimeMillis();
@@ -202,16 +304,14 @@ public class RearService extends Service {
                 if (media.isEmpty() && src != null && awake) {
                     // list cleared while running: keep showing the last file until new ones come
                     src.render(frame);
-                    frames.write(frame);
-                    frames.flush();
+                    writeFrame(frame);
                     blackSent = false;
                     Thread.sleep(src.delayMs());
                     continue;
                 }
                 if (media.isEmpty()) { // nothing shown yet: black, wait for files
                     if (!blackSent) {
-                        frames.write(black);
-                        frames.flush();
+                        writeFrame(black);
                         blackSent = true;
                     }
                     Thread.sleep(200);
@@ -222,8 +322,7 @@ public class RearService extends Service {
                 }
                 if (!awake) {
                     if (!blackSent) {
-                        frames.write(black);
-                        frames.flush();
+                        writeFrame(black);
                         blackSent = true;
                     }
                     if (src != null) { src.close(); src = null; srcKey = null; }
@@ -253,8 +352,7 @@ public class RearService extends Service {
                     srcKey = key;
                 }
                 src.render(frame);
-                frames.write(frame);
-                frames.flush();
+                writeFrame(frame);
                 Thread.sleep(src.delayMs());
             }
         } catch (Exception e) {
@@ -276,9 +374,23 @@ public class RearService extends Service {
             if (!getSharedPreferences("rear", MODE_PRIVATE).contains("saved_" + k)) ed.putString("saved_" + k, v);
             Root.run("settings put global " + k + " 0");
         }
+        // own small keyboard on the rear screen: make it the current keyboard for the session
+        boolean kbd = prefs.rearKeyboard();
+        if (kbd) {
+            String cur = Root.out("settings get secure default_input_method").trim();
+            if (!getSharedPreferences("rear", MODE_PRIVATE).contains("saved_ime") && !cur.equals(IME))
+                ed.putString("saved_ime", cur);
+            Root.run("ime enable " + IME + " ; ime set " + IME);
+        }
         ed.apply();
-        String cmd = "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " "
-                + prefs.appPackage() + " " + (prefs.imeOnRear() ? "local" : "fallback") + " " + prefs.dpi();
+        launcher = new Launcher(this, prefs.apps());
+        inLauncher = true;
+        haveAppFrame = false;
+        renderThread = new Thread(this::launcherLoop, "rear-launcher");
+        renderThread.start();
+        String ime = kbd ? "local" : "fallback";
+        String cmd = "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " - "
+                + ime + " " + prefs.dpi();
         appProc = Runtime.getRuntime().exec(new String[] {"su", "2000", "-c", cmd});
         appCmd = appProc.getOutputStream();
         Process ap = appProc;
@@ -293,7 +405,7 @@ public class RearService extends Service {
                         new Thread(() -> {
                             try {
                                 Process t = Runtime.getRuntime().exec(new String[] {"su", "-c",
-                                        "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " --tweak " + id});
+                                        "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " --tweak " + id + " " + ime});
                                 try (BufferedReader tr = new BufferedReader(new InputStreamReader(t.getErrorStream()))) {
                                     String tl;
                                     while ((tl = tr.readLine()) != null) Log.i(TAG, "root tweak: " + tl);
@@ -314,15 +426,17 @@ public class RearService extends Service {
             try (java.io.DataInputStream in = new java.io.DataInputStream(ap.getInputStream())) {
                 while (running) {
                     in.readFully(f);
+                    System.arraycopy(f, 0, lastAppFrame, 0, f.length);
+                    haveAppFrame = true;
+                    if (inLauncher) continue; // the grid is shown; the app keeps running behind it
                     if (prefs.offMode() == Prefs.OFF_TIMER && awake
                             && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
                     if (!awake) {
-                        if (!blackSent) { frames.write(black); frames.flush(); blackSent = true; }
+                        if (!blackSent) { writeFrame(black); blackSent = true; }
                         continue;
                     }
                     blackSent = false;
-                    frames.write(f);
-                    frames.flush();
+                    writeFrame(f);
                 }
             } catch (Exception e) {
                 if (running) Log.w(TAG, "app frames: " + e);
@@ -340,6 +454,11 @@ public class RearService extends Service {
             if (v.equals("null") || v.isEmpty()) Root.run("settings delete global " + k);
             else Root.run("settings put global " + k + " " + v);
             ed.remove("saved_" + k);
+        }
+        String ime = sp.getString("saved_ime", null);
+        if (ime != null) {
+            if (!ime.isEmpty() && !ime.equals("null")) Root.run("ime set " + ime);
+            ed.remove("saved_ime");
         }
         ed.apply();
     }
@@ -411,11 +530,13 @@ public class RearService extends Service {
                 .setOngoing(true)
                 .addAction(new Notification.Action.Builder(null, "Стоп", stop).build());
         if (new Prefs(this).mode() == Prefs.MODE_APP) {
-            b.setContentText("Приложение: " + new Prefs(this).appLabel());
+            b.setContentText("Приложения на заднем экране");
             b.addAction(new Notification.Action.Builder(null, "Назад", PendingIntent.getService(this, 2,
                     new Intent(this, RearService.class).setAction(ACTION_BACK), PendingIntent.FLAG_IMMUTABLE)).build());
-            b.addAction(new Notification.Action.Builder(null, "Домой", PendingIntent.getService(this, 3,
-                    new Intent(this, RearService.class).setAction(ACTION_HOME), PendingIntent.FLAG_IMMUTABLE)).build());
+            b.addAction(new Notification.Action.Builder(null, "Меню", PendingIntent.getService(this, 3,
+                    new Intent(this, RearService.class).setAction(ACTION_MENU), PendingIntent.FLAG_IMMUTABLE)).build());
+        } else if (new Prefs(this).mode() == Prefs.MODE_VIS) {
+            b.setContentText("Эквалайзер");
         }
         return b.build();
     }

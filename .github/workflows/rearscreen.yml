@@ -31,7 +31,8 @@ jobs:
           PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | grep -E "android-3[0-6]$" | sort -V | tail -1)
           echo "build-tools $BT, platform $PLAT"
           mkdir -p out/classes out/dex
-          "$BT/aapt2" link -o out/base.apk --manifest app/AndroidManifest.xml -I "$PLAT/android.jar" -A out/assets
+          "$BT/aapt2" compile --dir app/res -o out/res.zip
+          "$BT/aapt2" link -o out/base.apk --manifest app/AndroidManifest.xml -I "$PLAT/android.jar" -A out/assets out/res.zip
           javac --release 11 -Xlint:-options -cp "$PLAT/android.jar" -d out/classes $(find app/src -name '*.java')
           "$BT/d8" --release --min-api 30 --lib "$PLAT/android.jar" --output out/dex $(find out/classes -name '*.class')
           (cd out/dex && zip -q ../base.apk classes.dex)
@@ -48,4 +49,4 @@ jobs:
           TAG=rearscreen-${{ github.run_number }}
           gh release create "$TAG" RearScreen.apk --target "$GITHUB_SHA" \
             --title "Rear Screen (Oscal Tank 1) #${{ github.run_number }}" \
-            --notes "Media (photo / GIF / video) on the Oscal Tank 1 rear display. Needs root (Magisk)."
+            --notes "Oscal Tank 1 rear display: media, app grid with own keyboard, spectrum visualizer. Needs root (Magisk)."

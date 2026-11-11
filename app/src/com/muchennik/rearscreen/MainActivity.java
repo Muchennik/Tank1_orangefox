@@ -24,8 +24,8 @@ public class MainActivity extends Activity {
     private static final int PICK = 1;
     private static final int[] TIMER_STEPS = {5, 10, 15, 30, 45, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600};
     private Prefs prefs;
-    private TextView files, timerLabel, slideLabel, blLabel, status, appLabel, dpiLabel;
-    private LinearLayout root;
+    private TextView files, timerLabel, slideLabel, blLabel, status, dpiLabel, sensLabel;
+    private LinearLayout root, appsBox;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -45,19 +45,46 @@ public class MainActivity extends Activity {
         root.addView(status);
 
         header("Что показывать сзади");
-        root.addView(radios(new String[] {"Медиа (фото, GIF, видео)", "Приложение (с тачем и клавиатурой)"},
-                prefs.mode(), i -> { prefs.put("mode", i); refresh(); }));
+        root.addView(radios(new String[] {"Медиа (фото, GIF, видео)", "Приложения (меню иконок на заднем экране)",
+                        "Эквалайзер (звук)"},
+                prefs.mode(), i -> { prefs.put("mode", i); if (i == Prefs.MODE_VIS) askMic(); refresh(); }));
 
-        header("Приложение");
-        appLabel = text("", 14, false);
-        root.addView(appLabel);
-        root.addView(button("Выбрать приложение", v -> pickApp()));
-        root.addView(text("Клавиатура открывается на основном экране (на заднем она занимала бы весь экран).", 12, false));
+        header("Приложения на заднем экране");
+        root.addView(text("Сзади — сетка иконок (3×3, свайп влево/вправо — следующая страница). Тап по иконке "
+                + "открывает приложение. Вернуться к иконкам — кнопкой «Меню» (здесь или в уведомлении).", 12, false));
+        appsBox = new LinearLayout(this);
+        appsBox.setOrientation(LinearLayout.VERTICAL);
+        root.addView(appsBox);
+        LinearLayout ar = hrow();
+        ar.addView(button("+ Добавить", v -> addApps()));
+        ar.addView(button("Меню на заднем экране", v ->
+                startService(new Intent(this, RearService.class).setAction(RearService.ACTION_MENU))));
+        root.addView(ar);
+        header("Клавиатура для приложений");
+        root.addView(radios(new String[] {"Своя, на заднем экране (крупные клавиши, мультитап RU/EN)",
+                        "Обычная, на основном экране"},
+                prefs.rearKeyboard() ? 0 : 1, i -> prefs.put("kbd_rear", i == 0)));
+        root.addView(text("Своя клавиатура: как на кнопочном телефоне — жмёшь «абвг» 1–4 раза. ⇧ — заглавная "
+                + "(2 раза — капс), 123 — цифры, RU/EN — язык (долгое нажатие — выбор другой клавиатуры), "
+                + "▼ — скрыть. На время работы она становится текущей клавиатурой телефона, после «Стоп» "
+                + "возвращается твоя.", 12, false));
         dpiLabel = text("", 14, false);
         root.addView(dpiLabel);
         root.addView(seek(140, prefs.dpi() - 100, i -> { prefs.put("dpi", i + 100); refresh(); }));
         root.addView(text("Меньше плотность — больше влезает (мельче). Применяется при следующем запуске. "
                 + "Управление: тап/свайп по заднему экрану; «Назад», «Домой», «Стоп» — в уведомлении.", 12, false));
+
+        header("Эквалайзер");
+        root.addView(radios(new String[] {"Звук телефона (динамик, наушники, Bluetooth)", "Микрофон (звук вокруг)"},
+                prefs.visSource() == VisSource.SRC_OUT ? 0 : 1,
+                i -> { prefs.put("vis_src", i == 0 ? VisSource.SRC_OUT : VisSource.SRC_MIC); askMic(); }));
+        root.addView(radios(new String[] {"Столбики", "Зеркальные (от центра)"}, prefs.visStyle(),
+                i -> prefs.put("vis_style", i)));
+        sensLabel = text("", 14, false);
+        root.addView(sensLabel);
+        root.addView(seek(29, prefs.visSensitivity() - 1, i -> { prefs.put("vis_sens", i + 1); refresh(); }));
+        root.addView(text("Применяется при следующем запуске. Для обоих источников Android просит доступ к "
+                + "микрофону (так устроен захват звука).", 12, false));
 
         header("Медиа (для режима «Медиа»)");
         files = text("", 14, false);
@@ -108,6 +135,10 @@ public class MainActivity extends Activity {
         header("Управление");
         LinearLayout ctl = hrow();
         ctl.addView(button("▶ Показать", v -> {
+            if (prefs.mode() == Prefs.MODE_VIS && checkSelfPermission("android.permission.RECORD_AUDIO") != 0) {
+                askMic();
+                return;
+            }
             startForegroundService(new Intent(this, RearService.class).setAction(RearService.ACTION_START));
             status.postDelayed(this::refresh, 800);
         }));
@@ -131,7 +162,8 @@ public class MainActivity extends Activity {
     private void refresh() {
         if (status == null) return;
         status.setText(prefs.running() ? "● Показ идёт" : "○ Задний экран у Blackview");
-        appLabel.setText("Приложение: " + prefs.appLabel() + " (" + prefs.appPackage() + ")");
+        sensLabel.setText("Чувствительность: " + prefs.visSensitivity());
+        fillApps();
         dpiLabel.setText("Плотность: " + prefs.dpi() + " dpi");
         List<String> m = prefs.media();
         StringBuilder sb = new StringBuilder(m.isEmpty() ? "Файлы не выбраны" : "Файлов: " + m.size());
@@ -142,6 +174,87 @@ public class MainActivity extends Activity {
                 + (prefs.offMode() == Prefs.OFF_TIMER ? "" : " (только для режима «Через время»)"));
         slideLabel.setText("Смена файла каждые " + prefs.slideSec() + " с");
         blLabel.setText("Яркость: " + prefs.brightness() + " / 16");
+    }
+
+    private void askMic() {
+        if (checkSelfPermission("android.permission.RECORD_AUDIO") != 0)
+            requestPermissions(new String[] {"android.permission.RECORD_AUDIO"}, 3);
+    }
+
+    private String labelOf(String pkg) {
+        try {
+            android.content.pm.PackageManager pm = getPackageManager();
+            return pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString();
+        } catch (Exception e) {
+            return pkg;
+        }
+    }
+
+    /** the grid list with move up / down / remove */
+    private void fillApps() {
+        appsBox.removeAllViews();
+        List<String> apps = prefs.apps();
+        if (apps.isEmpty()) appsBox.addView(text("Список пуст", 14, false));
+        for (int k = 0; k < apps.size(); k++) {
+            final int i = k;
+            LinearLayout r = hrow();
+            r.setGravity(android.view.Gravity.CENTER_VERTICAL);
+            android.widget.ImageView iv = new android.widget.ImageView(this);
+            try { iv.setImageDrawable(getPackageManager().getApplicationIcon(apps.get(k))); } catch (Exception ignored) {}
+            iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
+            r.addView(iv);
+            TextView t = text("  " + (k + 1) + ". " + labelOf(apps.get(k)), 15, false);
+            t.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
+            r.addView(t);
+            r.addView(small("▲", v -> move(i, -1)));
+            r.addView(small("▼", v -> move(i, 1)));
+            r.addView(small("✕", v -> { List<String> l = prefs.apps(); l.remove(i); prefs.setApps(l); refresh(); }));
+            appsBox.addView(r);
+        }
+    }
+
+    private void move(int i, int d) {
+        List<String> l = prefs.apps();
+        int j = i + d;
+        if (j < 0 || j >= l.size()) return;
+        String x = l.get(i); l.set(i, l.get(j)); l.set(j, x);
+        prefs.setApps(l);
+        refresh();
+    }
+
+    private Button small(String s, View.OnClickListener l) {
+        Button b = new Button(this);
+        b.setText(s);
+        b.setOnClickListener(l);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(48), LinearLayout.LayoutParams.WRAP_CONTENT));
+        return b;
+    }
+
+    private void addApps() {
+        android.content.pm.PackageManager pm = getPackageManager();
+        Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<android.content.pm.ResolveInfo> all = pm.queryIntentActivities(main, 0);
+        List<String> have = prefs.apps();
+        List<String> pkgs = new ArrayList<>(), names = new ArrayList<>();
+        all.sort((a, b) -> a.loadLabel(pm).toString().compareToIgnoreCase(b.loadLabel(pm).toString()));
+        for (android.content.pm.ResolveInfo r : all) {
+            String p = r.activityInfo.packageName;
+            if (have.contains(p) || pkgs.contains(p) || p.equals(getPackageName())) continue;
+            pkgs.add(p);
+            names.add(r.loadLabel(pm).toString());
+        }
+        boolean[] checked = new boolean[pkgs.size()];
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Добавить на задний экран")
+                .setMultiChoiceItems(names.toArray(new String[0]), checked, (d, k, on) -> checked[k] = on)
+                .setPositiveButton("Добавить", (d, w) -> {
+                    List<String> l = prefs.apps();
+                    for (int k = 0; k < checked.length; k++) if (checked[k]) l.add(pkgs.get(k));
+                    prefs.setApps(l);
+                    refresh();
+                })
+                .setNegativeButton("Отмена", null)
+                .show();
     }
 
     private void pickApp() {
