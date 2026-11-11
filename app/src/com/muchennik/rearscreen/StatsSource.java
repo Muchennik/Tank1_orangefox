@@ -30,7 +30,7 @@ import java.util.Locale;
  * read /proc/stat or most thermal zones on Android 16).
  */
 final class StatsSource {
-    private static final int ACC = 0xFFFF7A3D, TXT = 0xFFF1F2F5, SUB = 0xFF8A90A0, TRACK = 0xFF2A2E37, CARD = 0xFF15171C;
+    private static final int ACC = 0xFFFF7A3D, TXT = 0xFFF1F2F5, SUB = 0xFF8A90A0, TRACK = 0xFF1A1D23, CARD = 0xFF0C0D10;
     private static final String END = "__END__";
     private static final String SCRIPT =
             "head -n 9 /proc/stat; grep -E '^(MemTotal|MemAvailable|SwapTotal|SwapFree):' /proc/meminfo; "
@@ -133,10 +133,10 @@ final class StatsSource {
         c.drawColor(Color.BLACK);
         // ---- header: clock + battery
         Date now = new Date();
-        text(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now), 10, 34, 32, TXT, med, Paint.Align.LEFT);
-        text(new SimpleDateFormat("EE, d MMM", new Locale("ru")).format(now), 12, 50, 12, SUB, reg, Paint.Align.LEFT);
-        text(level + "%", 229, 28, 18, level <= 15 ? 0xFFFF4D4D : TXT, med, Paint.Align.RIGHT);
-        text((charging ? "⚡ " : "") + fmt1(batT) + "° · " + mA + " мА", 229, 46, 11, SUB, cond, Paint.Align.RIGHT);
+        text(new SimpleDateFormat("HH:mm", Locale.getDefault()).format(now), 24, 38, 30, TXT, med, Paint.Align.LEFT);
+        text(new SimpleDateFormat("EE, d MMM", new Locale("ru")).format(now), 25, 53, 11, SUB, reg, Paint.Align.LEFT);
+        text(level + "%", 216, 33, 18, level <= 15 ? 0xFFFF4D4D : TXT, med, Paint.Align.RIGHT);
+        text((charging ? "⚡ " : "") + fmt1(batT) + "° · " + mA + " мА", 216, 51, 11, SUB, cond, Paint.Align.RIGHT);
 
         // ---- CPU card: ring + temps + history + cores
         card(6, 58, 234, 216);
@@ -159,7 +159,7 @@ final class StatsSource {
         text(gpu, 160, 90, 15, TXT, med, Paint.Align.LEFT);
         text("ГП" + (gpuFreq > 0 ? " · " + gpuFreq + " МГц" : ""), 161, 104, 10, SUB, reg, Paint.Align.LEFT);
         float hx = 90, hy = 112, hw = 138, hh = 22;
-        p.setColor(0xFF1E2128);
+        p.setColor(0xFF111317);
         c.drawRect(hx, hy, hx + hw, hy + hh, p);
         if (cpuHist.size() > 1) {
             Path path = new Path();
@@ -187,22 +187,22 @@ final class StatsSource {
         }
 
         // ---- RAM card
-        card(6, 222, 234, 264);
+        card(6, 220, 234, 284);
         long used = memTotal - memAvail;
         float ru = memTotal > 0 ? used / (float) memTotal : 0;
-        text("ОЗУ", 14, 238, 12, SUB, med, Paint.Align.LEFT);
-        text(gb(used) + " / " + gb(memTotal) + " ГБ", 226, 238, 13, TXT, med, Paint.Align.RIGHT);
-        bar(14, 245, 212, 7, ru, loadColor(ru));
-        text("свободно " + gb(memAvail) + " ГБ" + (swapTotal > 0 ? " · своп " + gb(swapTotal - swapFree) + " ГБ" : ""),
-                14, 260, 10, SUB, reg, Paint.Align.LEFT);
+        text("ОЗУ", 16, 235, 12, SUB, med, Paint.Align.LEFT);
+        text(gb(used) + " / " + gb(memTotal) + " ГБ", 224, 235, 13, TXT, med, Paint.Align.RIGHT);
+        bar(16, 241, 208, 6, ru, loadColor(ru));
+        text("своб. " + gb(memAvail) + " ГБ" + (swapTotal > 0 ? " · своп " + gb(swapTotal - swapFree) + " ГБ" : ""),
+                16, 258, 10, SUB, reg, Paint.Align.LEFT);
 
         // ---- storage line
         try {
             StatFs fs = new StatFs(Environment.getDataDirectory().getPath());
             long free = fs.getAvailableBytes() >> 10, tot = fs.getTotalBytes() >> 10;
-            text("Память", 14, 284, 11, SUB, med, Paint.Align.LEFT);
-            bar(62, 278, 106, 6, 1 - free / (float) tot, 0xFF6C7282);
-            text("своб. " + Math.round(free / 1048576f) + " ГБ", 228, 285, 11, TXT, cond, Paint.Align.RIGHT);
+            text("Диск", 24, 276, 10, SUB, med, Paint.Align.LEFT);
+            bar(52, 271, 100, 5, 1 - free / (float) tot, 0xFF6C7282);
+            text("своб. " + Math.round(free / 1048576f) + " ГБ", 216, 276, 10, TXT, cond, Paint.Align.RIGHT);
         } catch (Exception ignored) {}
 
         Frames.fromBitmap(bmp, frame);
