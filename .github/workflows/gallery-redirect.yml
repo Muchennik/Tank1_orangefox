@@ -15,7 +15,7 @@ jobs:
         run: |
           set -e
           BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
-          PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | sort -V | tail -1)
+          PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | grep -E "android-3[0-6]$" | sort -V | tail -1)
           echo "build-tools: $BT  platform: $PLAT"
           mkdir -p out/classes out/dex
           "$BT/aapt2" link -o out/base.apk --manifest app/AndroidManifest.xml -I "$PLAT/android.jar"
