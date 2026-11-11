@@ -1,14 +1,27 @@
 package com.muchennik.rearscreen;
 
 import android.app.Activity;
+import android.app.AlertDialog;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
+import android.content.res.ColorStateList;
 import android.database.Cursor;
+import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.ColorDrawable;
+import android.graphics.drawable.Drawable;
+import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.View;
-import android.widget.Button;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
@@ -17,146 +30,233 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Settings screen (built in code: no resources, no AndroidX). */
+/** Settings screen, built in code (no resources, no AndroidX). Dark, card-based. */
 public class MainActivity extends Activity {
     private static final int PICK = 1;
     private static final int[] TIMER_STEPS = {5, 10, 15, 30, 45, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600};
+
+    // palette
+    static final int BG = 0xFF0D0E12, CARD = 0xFF17191F, CARD2 = 0xFF21242C, LINE = 0xFF2A2E37,
+            TEXT = 0xFFF1F2F5, SUB = 0xFF8A90A0, ACCENT = 0xFFFF7A3D, ACCENT_DIM = 0x33FF7A3D, OK = 0xFF4ADE80;
+
     private Prefs prefs;
-    private TextView files, timerLabel, slideLabel, blLabel, status, dpiLabel, sensLabel;
-    private LinearLayout root, page, appsBox, appSec, visSec, mediaSec;
+    private LinearLayout page, appsBox, appSec, visSec, mediaSec, filesBox;
+    private TextView statusText, statusDot, startBtn, previewGlyph;
+    private final List<View> modeTiles = new ArrayList<>();
+    private final List<Runnable> refreshers = new ArrayList<>();
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         prefs = new Prefs(this);
         if (checkSelfPermission("android.permission.POST_NOTIFICATIONS") != 0)
             requestPermissions(new String[] {"android.permission.POST_NOTIFICATIONS"}, 2);
+        getWindow().setStatusBarColor(BG);
+        getWindow().setNavigationBarColor(BG);
+        getWindow().setBackgroundDrawable(new ColorDrawable(BG));
 
         ScrollView sv = new ScrollView(this);
-        root = new LinearLayout(this);
-        root.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(16);
-        root.setPadding(pad, pad, pad, pad);
-        sv.addView(root);
-        page = root;
+        sv.setFillViewport(true);
+        page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.setPadding(dp(18), dp(22), dp(18), dp(32));
+        sv.addView(page);
         setContentView(sv);
 
-        status = text("", 15, true);
-        root.addView(status);
+        // ---- title
+        TextView title = text("Задний экран", 30, TEXT, true);
+        title.setLetterSpacing(-0.01f);
+        page.addView(title);
+        page.addView(text("Oscal Tank 1 · 240 × 296", 13, SUB, false));
+        space(page, 18);
 
-        header("Что показывать сзади");
-        root.addView(radios(new String[] {"Медиа (фото, GIF, видео)", "Приложения (меню иконок на заднем экране)",
-                        "Эквалайзер (звук)"},
-                prefs.mode(), i -> { prefs.put("mode", i); if (i == Prefs.MODE_VIS) askMic(); refresh(); live(); }));
+        page.addView(hero());
+        space(page, 22);
 
-        // only the section of the chosen mode is shown
-        appSec = section(); visSec = section(); mediaSec = section();
-        root = appSec;
-        header("Приложения на заднем экране");
-        root.addView(text("Сзади — сетка иконок (3×3, свайп влево/вправо — следующая страница). Тап по иконке "
-                + "открывает приложение. Вернуться к иконкам — кнопкой «Меню» (здесь или в уведомлении).", 12, false));
-        appsBox = new LinearLayout(this);
-        appsBox.setOrientation(LinearLayout.VERTICAL);
-        root.addView(appsBox);
-        LinearLayout ar = hrow();
-        ar.addView(button("+ Добавить", v -> addApps()));
-        ar.addView(button("Меню на заднем экране", v ->
-                startService(new Intent(this, RearService.class).setAction(RearService.ACTION_MENU))));
-        root.addView(ar);
-        header("Клавиатура для приложений");
-        root.addView(radios(new String[] {"Своя, на заднем экране (крупные клавиши, мультитап RU/EN)",
-                        "Обычная, на основном экране"},
-                prefs.rearKeyboard() ? 0 : 1, i -> prefs.put("kbd_rear", i == 0)));
-        root.addView(text("Своя клавиатура: как на кнопочном телефоне — жмёшь «абвг» 1–4 раза. ⇧ — заглавная "
-                + "(2 раза — капс), 123 — цифры, RU/EN — язык (долгое нажатие — выбор другой клавиатуры), "
-                + "▼ — скрыть. На время работы она становится текущей клавиатурой телефона, после «Стоп» "
-                + "возвращается твоя.", 12, false));
-        dpiLabel = text("", 14, false);
-        root.addView(dpiLabel);
-        root.addView(seek(140, prefs.dpi() - 100, i -> { prefs.put("dpi", i + 100); refresh(); }));
-        root.addView(text("Меньше плотность — больше влезает (мельче). Применяется при следующем запуске. "
-                + "Управление: тап/свайп по заднему экрану; «Назад», «Меню», «Стоп» — в уведомлении.", 12, false));
+        // ---- mode tiles
+        page.addView(label("РЕЖИМ"));
+        LinearLayout tiles = new LinearLayout(this);
+        tiles.setOrientation(LinearLayout.HORIZONTAL);
+        String[][] modes = {{"▣", "Медиа", "фото · GIF · видео"}, {"⠿", "Приложения", "иконки сзади"},
+                {"▁▃▆", "Эквалайзер", "звук"}};
+        for (int i = 0; i < modes.length; i++) {
+            final int m = i;
+            View t = modeTile(modes[i][0], modes[i][1], modes[i][2], v -> {
+                prefs.put("mode", m);
+                if (m == Prefs.MODE_VIS) askMic();
+                refresh();
+                live();
+            });
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(104), 1);
+            if (i > 0) lp.leftMargin = dp(10);
+            tiles.addView(t, lp);
+            modeTiles.add(t);
+        }
+        page.addView(tiles);
+        space(page, 22);
 
-        root = visSec;
-        header("Эквалайзер");
-        root.addView(radios(new String[] {"Звук телефона (динамик, наушники, Bluetooth)", "Микрофон (звук вокруг)"},
-                prefs.visSource() == VisSource.SRC_OUT ? 0 : 1,
-                i -> { prefs.put("vis_src", i == 0 ? VisSource.SRC_OUT : VisSource.SRC_MIC); askMic(); }));
-        root.addView(radios(VisSource.STYLES, prefs.visStyle(), i -> prefs.put("vis_style", i)));
-        sensLabel = text("", 14, false);
-        root.addView(sensLabel);
-        root.addView(seek(29, prefs.visSensitivity() - 1, i -> { prefs.put("vis_sens", i + 1); refresh(); }));
-        root.addView(text("Меняется сразу, на ходу. Для обоих источников Android просит доступ к "
-                + "микрофону (так устроен захват звука).", 12, false));
+        // ---- per-mode sections
+        appSec = column(); visSec = column(); mediaSec = column();
+        page.addView(appSec); page.addView(visSec); page.addView(mediaSec);
+        buildApps();
+        buildVis();
+        buildMedia();
 
-        root = mediaSec;
-        header("Медиа");
-        files = text("", 14, false);
-        root.addView(files);
-        LinearLayout row = hrow();
-        row.addView(button("Выбрать файлы", v -> pick()));
-        row.addView(button("Очистить", v -> { prefs.setMedia(new ArrayList<>()); refresh(); }));
-        root.addView(row);
-        root.addView(text("Фото (JPG/PNG/WebP), GIF и видео (MP4/WebM, без звука, по кругу). "
-                + "Несколько файлов — слайд-шоу.", 12, false));
-
-        header("Подгонка под экран 240×296");
-        View fit = radios(new String[] {"Заполнить (обрезать края)", "Вписать (поля)", "Растянуть"},
-                prefs.fit(), i -> prefs.put("fit", i));
-        root.addView(fit);
-
-        header("Слайд-шоу");
-        slideLabel = text("", 14, false);
-        root.addView(slideLabel);
-        root.addView(seek(297, prefs.slideSec() - 3, i -> { prefs.put("slide", i + 3); refresh(); }));
-
-        root = page; // common settings
-        header("Когда гаснет");
-        root.addView(radios(new String[] {"Через время", "Вместе с основным экраном",
-                        "По двойному тапу сзади", "Никогда (только кнопкой «Стоп»)"},
-                prefs.offMode(), i -> { prefs.put("off", i); refresh(); }));
-        timerLabel = text("", 14, false);
-        root.addView(timerLabel);
-        root.addView(seek(TIMER_STEPS.length - 1, indexOf(prefs.timerSec()), i -> {
-            prefs.put("timer", TIMER_STEPS[i]);
-            refresh();
-        }));
-        header("Как включать снова (когда погасло)");
-        root.addView(radios(new String[] {"Никак (погасло — экран отдаётся Blackview)",
-                        "Одиночным тапом по заднему экрану", "Двойным тапом по заднему экрану"},
-                prefs.wakeMode(), i -> prefs.put("wake", i)));
-        root.addView(text("Например: «Через время» + «Одиночным тапом» — тапнул сзади, показало и "
-                + "погасло через заданное время.", 12, false));
-
-        header("Яркость");
-        blLabel = text("", 14, false);
-        root.addView(blLabel);
-        root.addView(seek(15, prefs.brightness() - 1, i -> {
+        // ---- common
+        page.addView(label("ЭКРАН"));
+        LinearLayout common = card();
+        common.addView(picker("Когда гаснет", new String[] {"Через время", "Вместе с основным экраном",
+                "По двойному тапу сзади", "Никогда (только «Стоп»)"}, prefs::offMode, i -> prefs.put("off", i)));
+        divider(common);
+        common.addView(slider("Время до погасания", TIMER_STEPS.length - 1, () -> indexOf(prefs.timerSec()),
+                i -> prefs.put("timer", TIMER_STEPS[i]), () -> {
+                    int t = prefs.timerSec();
+                    return (t < 60 ? t + " с" : t / 60 + " мин") + (prefs.offMode() == Prefs.OFF_TIMER ? "" : " · не исп.");
+                }));
+        divider(common);
+        common.addView(picker("Как включать снова", new String[] {"Никак (экран отдаётся Blackview)",
+                "Одиночный тап сзади", "Двойной тап сзади"}, prefs::wakeMode, i -> prefs.put("wake", i)));
+        divider(common);
+        common.addView(slider("Яркость", 15, () -> prefs.brightness() - 1, i -> {
             prefs.put("bl", i + 1);
-            refresh();
             if (prefs.running()) startService(new Intent(this, RearService.class).setAction(RearService.ACTION_BRIGHTNESS));
-        }));
-
-        header("Управление");
-        LinearLayout ctl = hrow();
-        ctl.addView(button("▶ Показать", v -> {
-            if (prefs.mode() == Prefs.MODE_VIS && checkSelfPermission("android.permission.RECORD_AUDIO") != 0) {
-                askMic();
-                return;
-            }
-            startForegroundService(new Intent(this, RearService.class).setAction(RearService.ACTION_START));
-            status.postDelayed(this::refresh, 800);
-        }));
-        ctl.addView(button("■ Стоп (экран Blackview)", v -> {
-            startService(new Intent(this, RearService.class).setAction(RearService.ACTION_STOP));
-            status.postDelayed(this::refresh, 800);
-        }));
-        root.addView(ctl);
-        root.addView(text("Двойной тап сзади гасит картинку (в режиме «Медиа»). Экран возвращается Blackview только "
-                + "кнопкой «Стоп» (здесь, в уведомлении или плиткой «Задний экран» в шторке).\n\n"
-                + "Кнопка «Показать» запускает выбранный режим: медиа или приложение.",
-                12, false));
+        }, () -> prefs.brightness() + " / 16"));
+        page.addView(common);
+        space(page, 14);
+        page.addView(hint("Экран возвращается Blackview только кнопкой «Остановить» — здесь, в уведомлении или "
+                + "плиткой «Задний экран» в шторке."));
         refresh();
     }
+
+    // ===================================================================== sections
+
+    private View hero() {
+        LinearLayout c = card();
+        c.setOrientation(LinearLayout.HORIZONTAL);
+        c.setGravity(Gravity.CENTER_VERTICAL);
+        c.setPadding(dp(16), dp(16), dp(16), dp(16));
+
+        // a tiny "rear panel" with the current mode glyph
+        FrameLayout panel = new FrameLayout(this);
+        panel.setBackground(round(0xFF000000, dp(12), LINE, dp(2)));
+        previewGlyph = text("", 22, ACCENT, true);
+        previewGlyph.setGravity(Gravity.CENTER);
+        panel.addView(previewGlyph, new FrameLayout.LayoutParams(-1, -1));
+        c.addView(panel, new LinearLayout.LayoutParams(dp(60), dp(74)));
+
+        LinearLayout mid = column();
+        mid.setPadding(dp(14), 0, dp(8), 0);
+        LinearLayout st = new LinearLayout(this);
+        st.setGravity(Gravity.CENTER_VERTICAL);
+        statusDot = text("●", 12, SUB, false);
+        st.addView(statusDot);
+        statusText = text("", 15, TEXT, true);
+        statusText.setPadding(dp(6), 0, 0, 0);
+        st.addView(statusText);
+        mid.addView(st);
+        TextView sub = text("Тап и свайп — прямо по заднему экрану", 12, SUB, false);
+        sub.setPadding(0, dp(3), 0, 0);
+        mid.addView(sub);
+        c.addView(mid, new LinearLayout.LayoutParams(0, -2, 1));
+
+        startBtn = text("", 14, Color.WHITE, true);
+        startBtn.setGravity(Gravity.CENTER);
+        startBtn.setPadding(dp(18), dp(12), dp(18), dp(12));
+        startBtn.setOnClickListener(v -> {
+            if (prefs.running()) {
+                startService(new Intent(this, RearService.class).setAction(RearService.ACTION_STOP));
+            } else {
+                if (prefs.mode() == Prefs.MODE_VIS && checkSelfPermission("android.permission.RECORD_AUDIO") != 0) {
+                    askMic();
+                    return;
+                }
+                startForegroundService(new Intent(this, RearService.class).setAction(RearService.ACTION_START));
+            }
+            startBtn.postDelayed(this::refresh, 700);
+            startBtn.postDelayed(this::refresh, 2600);
+        });
+        c.addView(startBtn);
+        return c;
+    }
+
+    private void buildApps() {
+        appSec.addView(label("ПРИЛОЖЕНИЯ НА ЗАДНЕМ ЭКРАНЕ"));
+        LinearLayout c = card();
+        appsBox = column();
+        c.addView(appsBox);
+        divider(c);
+        LinearLayout r = new LinearLayout(this);
+        r.setPadding(dp(12), dp(12), dp(12), dp(12));
+        r.addView(pill("+  Добавить", true, v -> addApps()), new LinearLayout.LayoutParams(0, -2, 1));
+        View menu = pill("Меню сзади", false, v ->
+                startService(new Intent(this, RearService.class).setAction(RearService.ACTION_MENU)));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+        lp.leftMargin = dp(10);
+        r.addView(menu, lp);
+        c.addView(r);
+        appSec.addView(c);
+        space(appSec, 8);
+        appSec.addView(hint("Сзади — сетка иконок 3×3, свайп влево/вправо листает. «Меню сзади» возвращает к иконкам."));
+        space(appSec, 14);
+
+        LinearLayout k = card();
+        k.addView(picker("Клавиатура", new String[] {"Своя, на заднем экране", "Обычная, на основном экране"},
+                () -> prefs.rearKeyboard() ? 0 : 1, i -> prefs.put("kbd_rear", i == 0)));
+        divider(k);
+        k.addView(slider("Масштаб приложения", 140, () -> prefs.dpi() - 100, i -> prefs.put("dpi", i + 100),
+                () -> prefs.dpi() + " dpi"));
+        appSec.addView(k);
+        space(appSec, 8);
+        appSec.addView(hint("Своя клавиатура — как на кнопочном телефоне: «абвг» 1–4 раза. ⇧ заглавная (×2 капс), "
+                + "123 цифры, RU/EN язык, ▼ скрыть. Масштаб — со следующего запуска; меньше dpi — больше влезает."));
+        space(appSec, 22);
+    }
+
+    private void buildVis() {
+        visSec.addView(label("ЭКВАЛАЙЗЕР"));
+        LinearLayout c = card();
+        c.addView(picker("Источник", new String[] {"Звук телефона", "Микрофон"},
+                () -> prefs.visSource() == VisSource.SRC_OUT ? 0 : 1,
+                i -> { prefs.put("vis_src", i == 0 ? VisSource.SRC_OUT : VisSource.SRC_MIC); askMic(); }));
+        divider(c);
+        c.addView(picker("Вид", VisSource.STYLES, prefs::visStyle, i -> prefs.put("vis_style", i)));
+        divider(c);
+        c.addView(slider("Чувствительность", 29, () -> prefs.visSensitivity() - 1, i -> prefs.put("vis_sens", i + 1),
+                () -> String.valueOf(prefs.visSensitivity())));
+        visSec.addView(c);
+        space(visSec, 8);
+        visSec.addView(hint("Всё меняется на ходу. «Звук телефона» — динамик, проводные и Bluetooth-наушники."));
+        space(visSec, 22);
+    }
+
+    private void buildMedia() {
+        mediaSec.addView(label("МЕДИА"));
+        LinearLayout c = card();
+        filesBox = column();
+        c.addView(filesBox);
+        divider(c);
+        LinearLayout r = new LinearLayout(this);
+        r.setPadding(dp(12), dp(12), dp(12), dp(12));
+        r.addView(pill("+  Файлы", true, v -> pick()), new LinearLayout.LayoutParams(0, -2, 1));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, -2, 1);
+        lp.leftMargin = dp(10);
+        r.addView(pill("Очистить", false, v -> { prefs.setMedia(new ArrayList<>()); refresh(); }), lp);
+        c.addView(r);
+        mediaSec.addView(c);
+        space(mediaSec, 14);
+
+        LinearLayout s = card();
+        s.addView(picker("Подгонка", new String[] {"Заполнить (обрезать края)", "Вписать (поля)", "Растянуть"},
+                prefs::fit, i -> prefs.put("fit", i)));
+        divider(s);
+        s.addView(slider("Слайд-шоу", 297, () -> prefs.slideSec() - 3, i -> prefs.put("slide", i + 3),
+                () -> "каждые " + prefs.slideSec() + " с"));
+        mediaSec.addView(s);
+        space(mediaSec, 8);
+        mediaSec.addView(hint("JPG, PNG, WebP, GIF, MP4, WebM. Несколько файлов — слайд-шоу."));
+        space(mediaSec, 22);
+    }
+
+    // ===================================================================== state
 
     @Override protected void onResume() {
         super.onResume();
@@ -164,42 +264,56 @@ public class MainActivity extends Activity {
     }
 
     private void refresh() {
-        if (status == null) return;
-        status.setText(prefs.running() ? "● Показ идёт" : "○ Задний экран у Blackview");
+        if (statusText == null) return;
+        boolean on = prefs.running();
         int mode = prefs.mode();
+        statusText.setText(on ? "Показ идёт" : "У Blackview");
+        statusDot.setTextColor(on ? OK : SUB);
+        startBtn.setText(on ? "Остановить" : "Запустить");
+        startBtn.setTextColor(on ? TEXT : Color.WHITE);
+        startBtn.setBackground(ripple(on ? round(CARD2, dp(24), LINE, dp(1)) : round(ACCENT, dp(24), 0, 0)));
+        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆"}[mode]);
+        previewGlyph.setTextColor(on ? ACCENT : 0xFF3A3F4A);
+        for (int i = 0; i < modeTiles.size(); i++) {
+            boolean sel = i == mode;
+            modeTiles.get(i).setBackground(ripple(round(sel ? ACCENT_DIM : CARD, dp(18), sel ? ACCENT : LINE, dp(sel ? 2 : 1))));
+        }
         appSec.setVisibility(mode == Prefs.MODE_APP ? View.VISIBLE : View.GONE);
         visSec.setVisibility(mode == Prefs.MODE_VIS ? View.VISIBLE : View.GONE);
         mediaSec.setVisibility(mode == Prefs.MODE_MEDIA ? View.VISIBLE : View.GONE);
-        sensLabel.setText("Чувствительность: " + prefs.visSensitivity());
+        for (Runnable r : refreshers) r.run();
         fillApps();
-        dpiLabel.setText("Плотность: " + prefs.dpi() + " dpi");
+        fillFiles();
+    }
+
+    private void fillFiles() {
+        filesBox.removeAllViews();
         List<String> m = prefs.media();
-        StringBuilder sb = new StringBuilder(m.isEmpty() ? "Файлы не выбраны" : "Файлов: " + m.size());
-        for (String u : m) sb.append("\n• ").append(name(Uri.parse(u)));
-        files.setText(sb);
-        int t = prefs.timerSec();
-        timerLabel.setText("Время: " + (t < 60 ? t + " с" : t / 60 + " мин")
-                + (prefs.offMode() == Prefs.OFF_TIMER ? "" : " (только для режима «Через время»)"));
-        slideLabel.setText("Смена файла каждые " + prefs.slideSec() + " с");
-        blLabel.setText("Яркость: " + prefs.brightness() + " / 16");
-    }
-
-    /** tell a running rear screen about the change (mode / app list) */
-    private void live() {
-        if (prefs.running()) startService(new Intent(this, RearService.class).setAction(RearService.ACTION_SWITCH));
-    }
-
-    private void askMic() {
-        if (checkSelfPermission("android.permission.RECORD_AUDIO") != 0)
-            requestPermissions(new String[] {"android.permission.RECORD_AUDIO"}, 3);
-    }
-
-    private String labelOf(String pkg) {
-        try {
-            android.content.pm.PackageManager pm = getPackageManager();
-            return pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString();
-        } catch (Exception e) {
-            return pkg;
+        if (m.isEmpty()) {
+            TextView t = text("Файлы не выбраны", 14, SUB, false);
+            t.setPadding(dp(16), dp(16), dp(16), dp(16));
+            filesBox.addView(t);
+            return;
+        }
+        for (int k = 0; k < m.size(); k++) {
+            final int i = k;
+            LinearLayout r = new LinearLayout(this);
+            r.setGravity(Gravity.CENTER_VERTICAL);
+            r.setPadding(dp(16), dp(10), dp(8), dp(10));
+            String n = name(Uri.parse(m.get(k)));
+            if (n == null) n = "?";
+            String ext = n.contains(".") ? n.substring(n.lastIndexOf('.') + 1).toUpperCase() : "?";
+            TextView badge = text(ext.length() > 4 ? ext.substring(0, 4) : ext, 10, ACCENT, true);
+            badge.setGravity(Gravity.CENTER);
+            badge.setBackground(round(ACCENT_DIM, dp(8), 0, 0));
+            r.addView(badge, new LinearLayout.LayoutParams(dp(40), dp(28)));
+            TextView t = text(n, 14, TEXT, false);
+            t.setSingleLine(true);
+            t.setEllipsize(TextUtils.TruncateAt.MIDDLE);
+            t.setPadding(dp(12), 0, dp(8), 0);
+            r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+            r.addView(iconBtn("✕", v -> { List<String> l = prefs.media(); l.remove(i); prefs.setMedia(l); refresh(); }));
+            filesBox.addView(r);
         }
     }
 
@@ -207,21 +321,31 @@ public class MainActivity extends Activity {
     private void fillApps() {
         appsBox.removeAllViews();
         List<String> apps = prefs.apps();
-        if (apps.isEmpty()) appsBox.addView(text("Список пуст", 14, false));
+        if (apps.isEmpty()) {
+            TextView t = text("Список пуст — добавь приложения", 14, SUB, false);
+            t.setPadding(dp(16), dp(16), dp(16), dp(16));
+            appsBox.addView(t);
+        }
         for (int k = 0; k < apps.size(); k++) {
             final int i = k;
-            LinearLayout r = hrow();
-            r.setGravity(android.view.Gravity.CENTER_VERTICAL);
-            android.widget.ImageView iv = new android.widget.ImageView(this);
+            LinearLayout r = new LinearLayout(this);
+            r.setGravity(Gravity.CENTER_VERTICAL);
+            r.setPadding(dp(16), dp(8), dp(6), dp(8));
+            ImageView iv = new ImageView(this);
             try { iv.setImageDrawable(getPackageManager().getApplicationIcon(apps.get(k))); } catch (Exception ignored) {}
-            iv.setLayoutParams(new LinearLayout.LayoutParams(dp(36), dp(36)));
-            r.addView(iv);
-            TextView t = text("  " + (k + 1) + ". " + labelOf(apps.get(k)), 15, false);
-            t.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-            r.addView(t);
-            r.addView(small("▲", v -> move(i, -1)));
-            r.addView(small("▼", v -> move(i, 1)));
-            r.addView(small("✕", v -> { List<String> l = prefs.apps(); l.remove(i); prefs.setApps(l); refresh(); live(); }));
+            r.addView(iv, new LinearLayout.LayoutParams(dp(38), dp(38)));
+            TextView t = text(labelOf(apps.get(k)), 15, TEXT, false);
+            t.setSingleLine(true);
+            t.setEllipsize(TextUtils.TruncateAt.END);
+            t.setPadding(dp(14), 0, dp(4), 0);
+            r.addView(t, new LinearLayout.LayoutParams(0, -2, 1));
+            View up = iconBtn("↑", v -> move(i, -1));
+            View dn = iconBtn("↓", v -> move(i, 1));
+            up.setAlpha(k == 0 ? 0.25f : 1f);
+            dn.setAlpha(k == apps.size() - 1 ? 0.25f : 1f);
+            r.addView(up);
+            r.addView(dn);
+            r.addView(iconBtn("✕", v -> { List<String> l = prefs.apps(); l.remove(i); prefs.setApps(l); refresh(); live(); }));
             appsBox.addView(r);
         }
     }
@@ -236,29 +360,40 @@ public class MainActivity extends Activity {
         live();
     }
 
-    private Button small(String s, View.OnClickListener l) {
-        Button b = new Button(this);
-        b.setText(s);
-        b.setOnClickListener(l);
-        b.setLayoutParams(new LinearLayout.LayoutParams(dp(48), LinearLayout.LayoutParams.WRAP_CONTENT));
-        return b;
+    /** tell a running rear screen about the change (mode / app list) */
+    private void live() {
+        if (prefs.running()) startService(new Intent(this, RearService.class).setAction(RearService.ACTION_SWITCH));
+    }
+
+    private void askMic() {
+        if (checkSelfPermission("android.permission.RECORD_AUDIO") != 0)
+            requestPermissions(new String[] {"android.permission.RECORD_AUDIO"}, 3);
+    }
+
+    private String labelOf(String pkg) {
+        try {
+            PackageManager pm = getPackageManager();
+            return pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString();
+        } catch (Exception e) {
+            return pkg;
+        }
     }
 
     private void addApps() {
-        android.content.pm.PackageManager pm = getPackageManager();
+        PackageManager pm = getPackageManager();
         Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<android.content.pm.ResolveInfo> all = pm.queryIntentActivities(main, 0);
+        List<ResolveInfo> all = pm.queryIntentActivities(main, 0);
         List<String> have = prefs.apps();
         List<String> pkgs = new ArrayList<>(), names = new ArrayList<>();
         all.sort((a, b) -> a.loadLabel(pm).toString().compareToIgnoreCase(b.loadLabel(pm).toString()));
-        for (android.content.pm.ResolveInfo r : all) {
+        for (ResolveInfo r : all) {
             String p = r.activityInfo.packageName;
             if (have.contains(p) || pkgs.contains(p) || p.equals(getPackageName())) continue;
             pkgs.add(p);
             names.add(r.loadLabel(pm).toString());
         }
         boolean[] checked = new boolean[pkgs.size()];
-        new android.app.AlertDialog.Builder(this)
+        new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
                 .setTitle("Добавить на задний экран")
                 .setMultiChoiceItems(names.toArray(new String[0]), checked, (d, k, on) -> checked[k] = on)
                 .setPositiveButton("Добавить", (d, w) -> {
@@ -269,22 +404,6 @@ public class MainActivity extends Activity {
                     live();
                 })
                 .setNegativeButton("Отмена", null)
-                .show();
-    }
-
-    private void pickApp() {
-        android.content.pm.PackageManager pm = getPackageManager();
-        Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
-        List<android.content.pm.ResolveInfo> apps = pm.queryIntentActivities(main, 0);
-        apps.sort((a, b) -> a.loadLabel(pm).toString().compareToIgnoreCase(b.loadLabel(pm).toString()));
-        String[] names = new String[apps.size()];
-        for (int k = 0; k < names.length; k++) names[k] = apps.get(k).loadLabel(pm).toString();
-        new android.app.AlertDialog.Builder(this)
-                .setTitle("Приложение для заднего экрана")
-                .setItems(names, (d, k) -> {
-                    prefs.putApp(apps.get(k).activityInfo.packageName, names[k]);
-                    refresh();
-                })
                 .show();
     }
 
@@ -326,80 +445,166 @@ public class MainActivity extends Activity {
         return TIMER_STEPS.length - 1;
     }
 
-    // --- tiny UI helpers ---
-    private int dp(int v) { return (int) (v * getResources().getDisplayMetrics().density); }
+    // ===================================================================== widgets
 
-    private TextView text(String s, int sp, boolean bold) {
+    interface IntCb { void on(int i); }
+    interface IntGet { int get(); }
+    interface StrGet { String get(); }
+
+    private int dp(float v) { return (int) (v * getResources().getDisplayMetrics().density + 0.5f); }
+
+    private TextView text(String s, float sp, int color, boolean bold) {
         TextView t = new TextView(this);
         t.setText(s);
         t.setTextSize(sp);
-        if (bold) t.setTypeface(Typeface.DEFAULT_BOLD);
-        t.setPadding(0, dp(4), 0, dp(4));
+        t.setTextColor(color);
+        t.setTypeface(Typeface.create(bold ? "sans-serif-medium" : "sans-serif", Typeface.NORMAL));
         return t;
     }
 
-    private String lastHeader = "";
-
-    private void header(String s) {
-        lastHeader = s;
-        TextView t = text(s, 17, true);
-        t.setPadding(0, dp(18), 0, dp(4));
-        root.addView(t);
-    }
-
-    private LinearLayout hrow() {
-        LinearLayout l = new LinearLayout(this);
-        l.setOrientation(LinearLayout.HORIZONTAL);
-        return l;
-    }
-
-    private Button button(String s, View.OnClickListener l) {
-        Button b = new Button(this);
-        b.setText(s);
-        b.setAllCaps(false);
-        b.setOnClickListener(l);
-        b.setLayoutParams(new LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1));
-        return b;
-    }
-
-    interface IntCb { void on(int i); }
-
-    private LinearLayout section() {
+    private LinearLayout column() {
         LinearLayout l = new LinearLayout(this);
         l.setOrientation(LinearLayout.VERTICAL);
-        page.addView(l);
         return l;
     }
 
-    /** One line with the current choice; tap opens the list (instead of a long radio list). */
-    private View radios(String[] items, int checked, IntCb cb) {
-        final String title = lastHeader;
-        final int[] cur = {Math.max(0, Math.min(items.length - 1, checked))};
-        Button b = new Button(this);
-        b.setAllCaps(false);
-        b.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
-        b.setText(items[cur[0]] + "   ▾");
-        b.setOnClickListener(v -> new android.app.AlertDialog.Builder(this)
-                .setTitle(title)
-                .setSingleChoiceItems(items, cur[0], (d, k) -> {
-                    cur[0] = k;
-                    b.setText(items[k] + "   ▾");
-                    d.dismiss();
-                    cb.on(k);
-                })
-                .show());
+    private void space(ViewGroup g, int h) {
+        g.addView(new View(this), new LinearLayout.LayoutParams(1, dp(h)));
+    }
+
+    private TextView label(String s) {
+        TextView t = text(s, 11.5f, SUB, true);
+        t.setLetterSpacing(0.12f);
+        t.setPadding(dp(4), 0, 0, dp(8));
+        return t;
+    }
+
+    private TextView hint(String s) {
+        TextView t = text(s, 12, 0xFF6C7282, false);
+        t.setLineSpacing(0, 1.2f);
+        t.setPadding(dp(4), 0, dp(4), 0);
+        return t;
+    }
+
+    static GradientDrawable round(int fill, float radius, int stroke, int strokeW) {
+        GradientDrawable g = new GradientDrawable();
+        g.setColor(fill);
+        g.setCornerRadius(radius);
+        if (strokeW > 0) g.setStroke(strokeW, stroke);
+        return g;
+    }
+
+    private Drawable ripple(Drawable content) {
+        return new RippleDrawable(ColorStateList.valueOf(0x22FFFFFF), content, round(Color.WHITE, dp(18), 0, 0));
+    }
+
+    private LinearLayout card() {
+        LinearLayout c = column();
+        c.setBackground(round(CARD, dp(20), LINE, dp(1)));
+        c.setClipToOutline(true);
+        return c;
+    }
+
+    private void divider(LinearLayout card) {
+        View v = new View(this);
+        v.setBackgroundColor(LINE);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(-1, 1);
+        lp.leftMargin = dp(16);
+        card.addView(v, lp);
+    }
+
+    private View modeTile(String glyph, String name, String sub, View.OnClickListener l) {
+        LinearLayout t = column();
+        t.setGravity(Gravity.CENTER);
+        t.setPadding(dp(6), dp(10), dp(6), dp(10));
+        TextView g = text(glyph, 22, ACCENT, true);
+        g.setGravity(Gravity.CENTER);
+        t.addView(g);
+        TextView n = text(name, 14, TEXT, true);
+        n.setGravity(Gravity.CENTER);
+        n.setPadding(0, dp(6), 0, 0);
+        t.addView(n);
+        TextView s = text(sub, 11, SUB, false);
+        s.setGravity(Gravity.CENTER);
+        t.addView(s);
+        t.setOnClickListener(l);
+        return t;
+    }
+
+    private TextView pill(String s, boolean primary, View.OnClickListener l) {
+        TextView b = text(s, 14, primary ? Color.WHITE : TEXT, true);
+        b.setGravity(Gravity.CENTER);
+        b.setPadding(dp(12), dp(12), dp(12), dp(12));
+        b.setBackground(ripple(primary ? round(ACCENT, dp(22), 0, 0) : round(CARD2, dp(22), LINE, dp(1))));
+        b.setOnClickListener(l);
         return b;
     }
 
-    private SeekBar seek(int max, int value, IntCb cb) {
+    private TextView iconBtn(String s, View.OnClickListener l) {
+        TextView b = text(s, 17, SUB, false);
+        b.setGravity(Gravity.CENTER);
+        b.setBackground(new RippleDrawable(ColorStateList.valueOf(0x33FFFFFF), null, null));
+        b.setOnClickListener(l);
+        b.setLayoutParams(new LinearLayout.LayoutParams(dp(42), dp(42)));
+        return b;
+    }
+
+    /** row: title + current value, tap opens a single-choice list */
+    private View picker(String title, String[] items, IntGet get, IntCb set) {
+        LinearLayout r = new LinearLayout(this);
+        r.setGravity(Gravity.CENTER_VERTICAL);
+        r.setPadding(dp(16), dp(14), dp(14), dp(14));
+        r.setBackground(new RippleDrawable(ColorStateList.valueOf(0x18FFFFFF), null, new ColorDrawable(Color.WHITE)));
+        LinearLayout col = column();
+        col.addView(text(title, 15, TEXT, false));
+        TextView v = text("", 13, ACCENT, false);
+        v.setPadding(0, dp(2), 0, 0);
+        col.addView(v);
+        r.addView(col, new LinearLayout.LayoutParams(0, -2, 1));
+        r.addView(text("›", 22, SUB, false));
+        Runnable upd = () -> v.setText(items[Math.max(0, Math.min(items.length - 1, get.get()))]);
+        refreshers.add(upd);
+        upd.run();
+        r.setOnClickListener(x -> new AlertDialog.Builder(this, android.R.style.Theme_DeviceDefault_Dialog_Alert)
+                .setTitle(title)
+                .setSingleChoiceItems(items, get.get(), (d, k) -> {
+                    d.dismiss();
+                    set.on(k);
+                    refresh();
+                })
+                .show());
+        return r;
+    }
+
+    /** row: title + value on the right, accent slider below */
+    private View slider(String title, int max, IntGet get, IntCb set, StrGet value) {
+        LinearLayout c = column();
+        c.setPadding(dp(16), dp(14), dp(16), dp(8));
+        LinearLayout top = new LinearLayout(this);
+        top.addView(text(title, 15, TEXT, false), new LinearLayout.LayoutParams(0, -2, 1));
+        TextView v = text("", 13, ACCENT, true);
+        top.addView(v);
+        c.addView(top);
         SeekBar s = new SeekBar(this);
         s.setMax(max);
-        s.setProgress(value);
+        s.setProgress(get.get());
+        s.setProgressTintList(ColorStateList.valueOf(ACCENT));
+        s.setThumbTintList(ColorStateList.valueOf(ACCENT));
+        s.setProgressBackgroundTintList(ColorStateList.valueOf(0xFF3A3F4A));
+        s.setPadding(dp(4), dp(10), dp(4), dp(6));
         s.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override public void onProgressChanged(SeekBar b, int p, boolean user) { if (user) cb.on(p); }
+            @Override public void onProgressChanged(SeekBar b, int p, boolean user) {
+                if (!user) return;
+                set.on(p);
+                v.setText(value.get());
+            }
             @Override public void onStartTrackingTouch(SeekBar b) {}
-            @Override public void onStopTrackingTouch(SeekBar b) {}
+            @Override public void onStopTrackingTouch(SeekBar b) { refresh(); }
         });
-        return s;
+        c.addView(s);
+        Runnable upd = () -> v.setText(value.get());
+        refreshers.add(upd);
+        upd.run();
+        return c;
     }
 }
