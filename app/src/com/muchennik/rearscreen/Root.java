@@ -25,6 +25,19 @@ final class Root {
         }
     }
 
+    /** Runs a shell command as root and returns its output ("" on failure). */
+    static String out(String cmd) {
+        try {
+            Process p = Runtime.getRuntime().exec(new String[] {"su", "-c", cmd});
+            String r = new String(p.getInputStream().readAllBytes());
+            p.waitFor();
+            return r;
+        } catch (Exception e) {
+            Log.e(TAG, "su " + cmd + ": " + e);
+            return "";
+        }
+    }
+
     static boolean available() {
         return run("id") == 0;
     }

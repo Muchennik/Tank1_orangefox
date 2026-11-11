@@ -9,6 +9,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Handler;
 import android.os.IBinder;
@@ -266,6 +267,16 @@ public class RearService extends Service {
     /** App mode: AppServer (shell uid, app_process) renders a virtual display; we relay its frames. */
     private void startApp() throws Exception {
         String apk = getApplicationInfo().sourceDir;
+        // "force desktop mode on external displays" (developer option, set on this phone) makes
+        // Android put a navigation bar, desktop windows and the keyboard on every extra display:
+        // switch it off while an app runs on the rear screen, restore it on stop
+        SharedPreferences.Editor ed = getSharedPreferences("rear", MODE_PRIVATE).edit();
+        for (String k : new String[] {"force_desktop_mode_on_external_displays", "enable_freeform_support"}) {
+            String v = Root.out("settings get global " + k).trim();
+            if (!getSharedPreferences("rear", MODE_PRIVATE).contains("saved_" + k)) ed.putString("saved_" + k, v);
+            Root.run("settings put global " + k + " 0");
+        }
+        ed.apply();
         String cmd = "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " "
                 + prefs.appPackage() + " " + (prefs.imeOnRear() ? "local" : "fallback") + " " + prefs.dpi();
         appProc = Runtime.getRuntime().exec(new String[] {"su", "2000", "-c", cmd});
@@ -320,6 +331,19 @@ public class RearService extends Service {
         }, "rear-app-frames").start();
     }
 
+    private void restoreDesktopSettings() {
+        SharedPreferences sp = getSharedPreferences("rear", MODE_PRIVATE);
+        SharedPreferences.Editor ed = sp.edit();
+        for (String k : new String[] {"force_desktop_mode_on_external_displays", "enable_freeform_support"}) {
+            String v = sp.getString("saved_" + k, null);
+            if (v == null) continue;
+            if (v.equals("null") || v.isEmpty()) Root.run("settings delete global " + k);
+            else Root.run("settings put global " + k + " " + v);
+            ed.remove("saved_" + k);
+        }
+        ed.apply();
+    }
+
     private void appCommand(String c) {
         OutputStream o = appCmd;
         if (o == null) return;
@@ -360,6 +384,7 @@ public class RearService extends Service {
                 p.destroy();
             }
             if (was || helper != null) Root.blackviewUi(true); // give the screen back to Blackview
+            restoreDesktopSettings();
             TileService.requestListeningState(this, new android.content.ComponentName(this, RearTile.class));
         }, "rear-stop").start();
         stopForeground(STOP_FOREGROUND_REMOVE);
