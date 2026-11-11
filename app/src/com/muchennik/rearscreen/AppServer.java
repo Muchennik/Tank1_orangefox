@@ -96,7 +96,8 @@ public final class AppServer {
         int flags = PUBLIC | OWN_CONTENT_ONLY | SUPPORTS_TOUCH | ROTATES_WITH_CONTENT
                 | DESTROY_CONTENT_ON_REMOVAL | SHOULD_SHOW_SYSTEM_DECORATIONS | TRUSTED
                 | OWN_DISPLAY_GROUP | ALWAYS_UNLOCKED | TOUCH_FEEDBACK_DISABLED;
-        if (android.os.Build.VERSION.SDK_INT >= 34) flags |= OWN_FOCUS;
+        // no OWN_FOCUS: a touch on the rear display makes it the focused display, otherwise focus
+        // jumps back to the main display and the keyboard closes right after opening
         Constructor<DisplayManager> c = DisplayManager.class.getDeclaredConstructor(Context.class);
         c.setAccessible(true);
         DisplayManager dm = c.newInstance(ctx);
@@ -213,7 +214,9 @@ public final class AppServer {
             return;
         }
         log("I launch " + comp + " on " + displayId);
-        sh("am start --display " + displayId + " -f 0x10200000 -n " + comp);
+        // Android 16 opens apps on a display with system decorations in desktop (freeform) mode:
+        // force fullscreen (WINDOWING_MODE_FULLSCREEN = 1)
+        sh("am start --display " + displayId + " --windowingMode 1 -f 0x10200000 -n " + comp);
     }
 
     private static void sh(String cmd) {
