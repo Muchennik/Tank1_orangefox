@@ -64,7 +64,17 @@ jobs:
           cd "$HOME"
           git clone https://gitlab.com/OrangeFox/sync.git fox_sync
           cd fox_sync
-          ./orangefox_sync.sh --branch "${{ inputs.fox_branch }}" --path "$FOX" 2>&1 | tee "$GITHUB_WORKSPACE/logs/sync.log"
+          # android.googlesource.com sometimes answers 502 for a few repos: finish the sync with retries
+          if ! ./orangefox_sync.sh --branch "${{ inputs.fox_branch }}" --path "$FOX" 2>&1 | tee "$GITHUB_WORKSPACE/logs/sync.log"; then
+            cd "$FOX"
+            ok=0
+            for i in 1 2 3 4 5 6; do
+              echo "== repo sync retry $i"
+              if python3 .repo/repo/repo sync -c --no-tags --no-clone-bundle --optimized-fetch -j4 2>&1 | tee -a "$GITHUB_WORKSPACE/logs/sync.log"; then ok=1; break; fi
+              sleep $((60 * i))
+            done
+            [ "$ok" = 1 ] || { echo "::error::repo sync failed after retries"; exit 1; }
+          fi
           df -h /mnt
           # git metadata is not needed for building; frees a lot of space
           du -sh "$FOX/.repo" || true
