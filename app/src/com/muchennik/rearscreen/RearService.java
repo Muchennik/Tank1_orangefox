@@ -31,7 +31,7 @@ import java.util.List;
  */
 public class RearService extends Service {
     static final String ACTION_START = "start", ACTION_STOP = "stop", ACTION_BRIGHTNESS = "bl",
-            ACTION_BACK = "back", ACTION_HOME = "home", ACTION_MENU = "menu";
+            ACTION_BACK = "back", ACTION_HOME = "home", ACTION_MENU = "menu", ACTION_SWITCH = "switch";
     static final String IME = "com.muchennik.rearscreen/.RearIme";
     private static final String TAG = Root.TAG;
     private static final int NOTIF = 1;
@@ -75,6 +75,9 @@ public class RearService extends Service {
             stopAll();
         } else if (ACTION_BACK.equals(a) || ACTION_HOME.equals(a)) {
             appCommand("KEY " + (ACTION_BACK.equals(a) ? 4 : 3));
+        } else if (ACTION_SWITCH.equals(a)) {
+            if (running) switchMode();
+            if (running && appMode) launcher = new Launcher(this, prefs.apps()); // app list edited: new grid
         } else if (ACTION_MENU.equals(a)) {
             if (running && appMode) {
                 appCommand("MENU");
@@ -109,16 +112,8 @@ public class RearService extends Service {
                 wl = ((PowerManager) getSystemService(POWER_SERVICE))
                         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "rearscreen:play");
                 index = 0;
-                appMode = prefs.mode() == Prefs.MODE_APP;
                 wake();
-                if (appMode) startApp();
-                else if (prefs.mode() == Prefs.MODE_VIS) {
-                    renderThread = new Thread(this::visLoop, "rear-vis");
-                    renderThread.start();
-                } else {
-                    renderThread = new Thread(this::renderLoop, "rear-render");
-                    renderThread.start();
-                }
+                startMode();
                 TileService.requestListeningState(this,
                         new android.content.ComponentName(this, RearTile.class));
             } catch (Exception e) {
@@ -187,6 +182,56 @@ public class RearService extends Service {
         }
     }
 
+    /** generation of the running mode: loops of an older generation end on their own */
+    private volatile int gen;
+    private volatile int modeShown = -1;
+
+    private void startMode() throws Exception {
+        int m = prefs.mode();
+        modeShown = m;
+        appMode = m == Prefs.MODE_APP;
+        if (appMode) startApp();
+        else if (m == Prefs.MODE_VIS) {
+            renderThread = new Thread(this::visLoop, "rear-vis");
+            renderThread.start();
+        } else {
+            renderThread = new Thread(this::renderLoop, "rear-render");
+            renderThread.start();
+        }
+        main.post(() -> getSystemService(NotificationManager.class).notify(NOTIF, notification()));
+    }
+
+    /** Mode changed in the settings while showing: switch without giving the screen back. */
+    private void switchMode() {
+        new Thread(() -> {
+            synchronized (RearService.this) {
+                if (!running || prefs.mode() == modeShown) return;
+                gen++;
+                boolean wasApp = appMode;
+                appMode = false;
+                Process ap = appProc;
+                appProc = null;
+                if (ap != null) {
+                    try { appCmd.write("QUIT\n".getBytes()); appCmd.flush(); } catch (Exception ignored) {}
+                    try { Thread.sleep(300); } catch (InterruptedException ignored) {}
+                    ap.destroy();
+                    appCmd = null;
+                }
+                if (wasApp) restoreDesktopSettings();
+                try { if (renderThread != null) renderThread.join(1500); } catch (InterruptedException ignored) {}
+                try {
+                    index = 0;
+                    wake();
+                    startMode();
+                } catch (Exception e) {
+                    Log.e(TAG, "switch", e);
+                    toast("Задний экран: " + e.getMessage());
+                    main.post(this::stopAll);
+                }
+            }
+        }, "rear-switch").start();
+    }
+
     private void writeFrame(byte[] f) throws java.io.IOException {
         synchronized (frameLock) {
             frames.write(f);
@@ -207,7 +252,8 @@ public class RearService extends Service {
         VisSource v = null;
         boolean blackSent = false;
         try {
-            while (running) {
+            final int g = gen;
+            while (running && g == gen) {
                 if (awake && prefs.offMode() == Prefs.OFF_TIMER
                         && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
                 if (!awake) {
@@ -246,7 +292,8 @@ public class RearService extends Service {
         byte[] black = new byte[Frames.SIZE];
         boolean blackSent = false, wasLauncher = false;
         try {
-            while (running) {
+            final int g = gen;
+            while (running && g == gen) {
                 if (awake && prefs.offMode() == Prefs.OFF_TIMER
                         && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
                 Launcher la = launcher;
@@ -299,7 +346,8 @@ public class RearService extends Service {
         String srcKey = null; // uri + fit of the open source: reloaded when either changes
         boolean blackSent = false;
         try {
-            while (running) {
+            final int g = gen;
+            while (running && g == gen) {
                 List<String> media = prefs.media();
                 long now = SystemClock.uptimeMillis();
                 if (media.isEmpty() && src != null && awake) {
@@ -420,12 +468,14 @@ public class RearService extends Service {
                 }
             } catch (Exception ignored) {}
         }, "rear-app-log").start();
+        final int g0 = gen;
         new Thread(() -> { // frames: AppServer stdout -> helper stdin
             byte[] f = new byte[Frames.SIZE];
             byte[] black = new byte[Frames.SIZE];
             boolean blackSent = false;
             try (java.io.DataInputStream in = new java.io.DataInputStream(ap.getInputStream())) {
-                while (running) {
+                final int g = gen;
+                while (running && g == gen) {
                     in.readFully(f);
                     System.arraycopy(f, 0, lastAppFrame, 0, f.length);
                     haveAppFrame = true;
@@ -442,7 +492,7 @@ public class RearService extends Service {
             } catch (Exception e) {
                 if (running) Log.w(TAG, "app frames: " + e);
             }
-            if (running) main.post(this::stopAll); // AppServer died
+            if (running && g0 == gen) main.post(this::stopAll); // AppServer died
         }, "rear-app-frames").start();
     }
 

@@ -46,7 +46,7 @@ public class MainActivity extends Activity {
         header("Что показывать сзади");
         root.addView(radios(new String[] {"Медиа (фото, GIF, видео)", "Приложения (меню иконок на заднем экране)",
                         "Эквалайзер (звук)"},
-                prefs.mode(), i -> { prefs.put("mode", i); if (i == Prefs.MODE_VIS) askMic(); refresh(); }));
+                prefs.mode(), i -> { prefs.put("mode", i); if (i == Prefs.MODE_VIS) askMic(); refresh(); live(); }));
 
         // only the section of the chosen mode is shown
         appSec = section(); visSec = section(); mediaSec = section();
@@ -184,6 +184,11 @@ public class MainActivity extends Activity {
         blLabel.setText("Яркость: " + prefs.brightness() + " / 16");
     }
 
+    /** tell a running rear screen about the change (mode / app list) */
+    private void live() {
+        if (prefs.running()) startService(new Intent(this, RearService.class).setAction(RearService.ACTION_SWITCH));
+    }
+
     private void askMic() {
         if (checkSelfPermission("android.permission.RECORD_AUDIO") != 0)
             requestPermissions(new String[] {"android.permission.RECORD_AUDIO"}, 3);
@@ -216,7 +221,7 @@ public class MainActivity extends Activity {
             r.addView(t);
             r.addView(small("▲", v -> move(i, -1)));
             r.addView(small("▼", v -> move(i, 1)));
-            r.addView(small("✕", v -> { List<String> l = prefs.apps(); l.remove(i); prefs.setApps(l); refresh(); }));
+            r.addView(small("✕", v -> { List<String> l = prefs.apps(); l.remove(i); prefs.setApps(l); refresh(); live(); }));
             appsBox.addView(r);
         }
     }
@@ -228,6 +233,7 @@ public class MainActivity extends Activity {
         String x = l.get(i); l.set(i, l.get(j)); l.set(j, x);
         prefs.setApps(l);
         refresh();
+        live();
     }
 
     private Button small(String s, View.OnClickListener l) {
@@ -260,6 +266,7 @@ public class MainActivity extends Activity {
                     for (int k = 0; k < checked.length; k++) if (checked[k]) l.add(pkgs.get(k));
                     prefs.setApps(l);
                     refresh();
+                    live();
                 })
                 .setNegativeButton("Отмена", null)
                 .show();
