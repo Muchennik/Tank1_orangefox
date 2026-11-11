@@ -1,6 +1,9 @@
 # MTK boot control HAL (from stock recovery) — slot switching in OrangeFox
 service vendor.boot-default /system/bin/hw/android.hardware.boot-service.mtk_recovery
     class early_hal
+    # stock A16 blobs need the stock libc++ (__libcpp_verbose_abort); keep them out of
+    # /system/lib64 so they don't replace what OrangeFox's own recovery binary links against
+    setenv LD_LIBRARY_PATH /system/lib64/stockhal:/system/lib64
     user root
     group root
     seclabel u:r:recovery:s0

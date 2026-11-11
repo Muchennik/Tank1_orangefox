@@ -118,6 +118,13 @@ jobs:
           OUT="$FOX/out/target/product/$DEVICE"
           xz -dc tree/stock/vendor_boot.img.xz > stock_vendor_boot.img
           (cd . && sed 's#vendor_boot.img#stock_vendor_boot.img#' tree/stock/SHA256SUMS | sha256sum -c -)
+          echo "== link check (would every binary in the recovery ramdisk start?)"
+          R="$OUT/recovery/root"
+          python3 tree/tools/symcheck.py "$R" /system/lib64 "$R/system/bin/recovery"   # must pass
+          python3 tree/tools/symcheck.py "$R" /system/lib64/stockhal:/system/lib64 "$R"/system/bin/hw/android.hardware.boot-service.mtk_recovery || true
+          for b in "$R"/vendor/bin/teed "$R"/vendor/bin/hw/*; do
+            python3 tree/tools/symcheck.py "$R" /vendor/lib64:/vendor/lib64/hw:/system/lib64 "$b" || true
+          done
           echo "== built image"; python3 tree/tools/vendor_boot_tool.py info "$OUT/vendor_boot.img"
           mkdir -p release
           NAME="OrangeFox-${{ inputs.fox_branch }}-TANK_1-vendor_boot-$(date +%Y%m%d)-${{ github.run_number }}.img"
