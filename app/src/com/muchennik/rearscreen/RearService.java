@@ -75,7 +75,6 @@ public class RearService extends Service {
         new Thread(() -> {
             try {
                 if (!Root.available()) throw new IllegalStateException("нет root (su)");
-                if (prefs.media().isEmpty()) throw new IllegalStateException("не выбраны файлы");
                 helper = Root.helper(this);
                 Root.blackviewUi(false);
                 // DKSystemUI reacts to the switch a moment later and turns the panel off
@@ -174,13 +173,22 @@ public class RearService extends Service {
         byte[] frame = new byte[Frames.SIZE];
         byte[] black = new byte[Frames.SIZE];
         Source src = null;
-        int srcIndex = -1;
+        String srcKey = null; // uri + fit of the open source: reloaded when either changes
         boolean blackSent = false;
         try {
             while (running) {
                 List<String> media = prefs.media();
-                if (media.isEmpty()) break;
                 long now = SystemClock.uptimeMillis();
+                if (media.isEmpty()) { // list cleared while running: black, wait for new files
+                    if (src != null) { src.close(); src = null; srcKey = null; }
+                    if (!blackSent) {
+                        frames.write(black);
+                        frames.flush();
+                        blackSent = true;
+                    }
+                    Thread.sleep(200);
+                    continue;
+                }
                 if (awake && prefs.offMode() == Prefs.OFF_TIMER && now - awakeSince > prefs.timerSec() * 1000L) {
                     sleep();
                 }
@@ -190,7 +198,7 @@ public class RearService extends Service {
                         frames.flush();
                         blackSent = true;
                     }
-                    if (src != null) { src.close(); src = null; srcIndex = -1; }
+                    if (src != null) { src.close(); src = null; srcKey = null; }
                     Thread.sleep(100);
                     continue;
                 }
@@ -200,9 +208,11 @@ public class RearService extends Service {
                     slideSince = now;
                 }
                 int want = index % media.size();
-                if (src == null || srcIndex != want) {
+                String key = media.get(want) + "|" + prefs.fit();
+                if (src == null || !key.equals(srcKey)) {
                     if (src != null) src.close();
                     src = null;
+                    srcKey = null;
                     try {
                         src = Source.open(this, Uri.parse(media.get(want)), prefs.fit());
                     } catch (Exception e) {
@@ -212,7 +222,7 @@ public class RearService extends Service {
                         Thread.sleep(500);
                         continue;
                     }
-                    srcIndex = want;
+                    srcKey = key;
                 }
                 src.render(frame);
                 frames.write(frame);
