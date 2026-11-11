@@ -1,0 +1,49 @@
+name: Gallery redirect module
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tools-gallery-redirect]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build stub APK
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | sort -V | tail -1)
+          echo "build-tools: $BT  platform: $PLAT"
+          mkdir -p out/classes out/dex
+          "$BT/aapt2" link -o out/base.apk --manifest app/AndroidManifest.xml -I "$PLAT/android.jar"
+          javac --release 11 -cp "$PLAT/android.jar" -d out/classes app/src/com/muchennik/galleryredirect/*.java
+          "$BT/d8" --release --min-api 30 --lib "$PLAT/android.jar" --output out/dex out/classes/com/muchennik/galleryredirect/*.class
+          (cd out/dex && zip -q ../base.apk classes.dex)
+          "$BT/zipalign" -f -p 4 out/base.apk out/aligned.apk
+          keytool -genkeypair -keystore out/key.jks -storepass android -keypass android -alias redirect \
+            -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Muchen'nik gallery redirect"
+          "$BT/apksigner" sign --ks out/key.jks --ks-pass pass:android --key-pass pass:android \
+            --out out/DKMimediaGallery.apk out/aligned.apk
+          "$BT/apksigner" verify -v out/DKMimediaGallery.apk
+          "$BT/aapt2" dump badging out/DKMimediaGallery.apk | head -5
+
+      - name: Package Magisk module
+        run: |
+          set -e
+          M=out/module
+          mkdir -p $M/system/app/DKMimediaGallery $M/META-INF/com/google/android
+          cp module/* $M/
+          cp out/DKMimediaGallery.apk $M/system/app/DKMimediaGallery/
+          curl -fsSL -o $M/META-INF/com/google/android/update-binary \
+            https://raw.githubusercontent.com/topjohnwu/Magisk/master/scripts/module_installer.sh
+          printf '#MAGISK\n' > $M/META-INF/com/google/android/updater-script
+          (cd $M && zip -qr ../../tank_gallery_redirect_v1.zip .)
+          unzip -l tank_gallery_redirect_v1.zip
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: tank_gallery_redirect
+          path: tank_gallery_redirect_v1.zip

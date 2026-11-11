@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Stub that takes over com.blackview.photos.gallery: the stock DokeOS camera opens its
+     thumbnails only in this package (act=com.android.camera.action.REVIEW, explicit pkg).
+     Everything it receives is forwarded to Google Photos. -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.blackview.photos.gallery"
+    android:versionCode="2100000000"
+    android:versionName="redirect-1">
+    <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="34" />
+    <application android:label="Gallery → Google Photos" android:hasCode="true">
+        <activity android:name="com.muchennik.galleryredirect.Redirect"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="com.android.camera.action.REVIEW" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:mimeType="image/*" />
+                <data android:mimeType="video/*" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.android.camera.action.REVIEW" />
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <data android:scheme="content" />
+                <data android:scheme="file" />
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

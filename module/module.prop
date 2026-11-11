@@ -1,0 +1,6 @@
+id=tank_gallery_redirect
+name=Camera thumbnails -> Google Photos
+version=v1
+versionCode=1
+author=Muchen'nik
+description=Replaces the DokeOS gallery (com.blackview.photos.gallery) with a stub that opens camera photos in Google Photos. Disable or remove the module to get the stock gallery back.
