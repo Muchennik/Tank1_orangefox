@@ -5,6 +5,9 @@ on:
   push:
     branches: [tools-gallery-redirect]
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -43,7 +46,11 @@ jobs:
           (cd $M && zip -qr ../../tank_gallery_redirect_v1.zip .)
           unzip -l tank_gallery_redirect_v1.zip
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: tank_gallery_redirect
-          path: tank_gallery_redirect_v1.zip
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=gallery-redirect-${{ github.run_number }}
+          gh release create "$TAG" tank_gallery_redirect_v1.zip --target "$GITHUB_SHA" \
+            --title "Tank 1: camera thumbnails -> Google Photos (Magisk module) #${{ github.run_number }}" \
+            --notes "Magisk module. Replaces com.blackview.photos.gallery (/system/app/DKMimediaGallery) with a stub that opens camera photos in Google Photos. Disable/remove the module to restore the stock gallery."
