@@ -10,8 +10,6 @@ import android.provider.OpenableColumns;
 import android.view.View;
 import android.widget.Button;
 import android.widget.LinearLayout;
-import android.widget.RadioButton;
-import android.widget.RadioGroup;
 import android.widget.ScrollView;
 import android.widget.SeekBar;
 import android.widget.TextView;
@@ -25,7 +23,7 @@ public class MainActivity extends Activity {
     private static final int[] TIMER_STEPS = {5, 10, 15, 30, 45, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600};
     private Prefs prefs;
     private TextView files, timerLabel, slideLabel, blLabel, status, dpiLabel, sensLabel;
-    private LinearLayout root, appsBox;
+    private LinearLayout root, page, appsBox, appSec, visSec, mediaSec;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -39,6 +37,7 @@ public class MainActivity extends Activity {
         int pad = dp(16);
         root.setPadding(pad, pad, pad, pad);
         sv.addView(root);
+        page = root;
         setContentView(sv);
 
         status = text("", 15, true);
@@ -49,6 +48,9 @@ public class MainActivity extends Activity {
                         "Эквалайзер (звук)"},
                 prefs.mode(), i -> { prefs.put("mode", i); if (i == Prefs.MODE_VIS) askMic(); refresh(); }));
 
+        // only the section of the chosen mode is shown
+        appSec = section(); visSec = section(); mediaSec = section();
+        root = appSec;
         header("Приложения на заднем экране");
         root.addView(text("Сзади — сетка иконок (3×3, свайп влево/вправо — следующая страница). Тап по иконке "
                 + "открывает приложение. Вернуться к иконкам — кнопкой «Меню» (здесь или в уведомлении).", 12, false));
@@ -72,21 +74,22 @@ public class MainActivity extends Activity {
         root.addView(dpiLabel);
         root.addView(seek(140, prefs.dpi() - 100, i -> { prefs.put("dpi", i + 100); refresh(); }));
         root.addView(text("Меньше плотность — больше влезает (мельче). Применяется при следующем запуске. "
-                + "Управление: тап/свайп по заднему экрану; «Назад», «Домой», «Стоп» — в уведомлении.", 12, false));
+                + "Управление: тап/свайп по заднему экрану; «Назад», «Меню», «Стоп» — в уведомлении.", 12, false));
 
+        root = visSec;
         header("Эквалайзер");
         root.addView(radios(new String[] {"Звук телефона (динамик, наушники, Bluetooth)", "Микрофон (звук вокруг)"},
                 prefs.visSource() == VisSource.SRC_OUT ? 0 : 1,
                 i -> { prefs.put("vis_src", i == 0 ? VisSource.SRC_OUT : VisSource.SRC_MIC); askMic(); }));
-        root.addView(radios(new String[] {"Столбики", "Зеркальные (от центра)"}, prefs.visStyle(),
-                i -> prefs.put("vis_style", i)));
+        root.addView(radios(VisSource.STYLES, prefs.visStyle(), i -> prefs.put("vis_style", i)));
         sensLabel = text("", 14, false);
         root.addView(sensLabel);
         root.addView(seek(29, prefs.visSensitivity() - 1, i -> { prefs.put("vis_sens", i + 1); refresh(); }));
-        root.addView(text("Применяется при следующем запуске. Для обоих источников Android просит доступ к "
+        root.addView(text("Меняется сразу, на ходу. Для обоих источников Android просит доступ к "
                 + "микрофону (так устроен захват звука).", 12, false));
 
-        header("Медиа (для режима «Медиа»)");
+        root = mediaSec;
+        header("Медиа");
         files = text("", 14, false);
         root.addView(files);
         LinearLayout row = hrow();
@@ -97,10 +100,16 @@ public class MainActivity extends Activity {
                 + "Несколько файлов — слайд-шоу.", 12, false));
 
         header("Подгонка под экран 240×296");
-        RadioGroup fit = radios(new String[] {"Заполнить (обрезать края)", "Вписать (поля)", "Растянуть"},
+        View fit = radios(new String[] {"Заполнить (обрезать края)", "Вписать (поля)", "Растянуть"},
                 prefs.fit(), i -> prefs.put("fit", i));
         root.addView(fit);
 
+        header("Слайд-шоу");
+        slideLabel = text("", 14, false);
+        root.addView(slideLabel);
+        root.addView(seek(297, prefs.slideSec() - 3, i -> { prefs.put("slide", i + 3); refresh(); }));
+
+        root = page; // common settings
         header("Когда гаснет");
         root.addView(radios(new String[] {"Через время", "Вместе с основным экраном",
                         "По двойному тапу сзади", "Никогда (только кнопкой «Стоп»)"},
@@ -117,11 +126,6 @@ public class MainActivity extends Activity {
                 prefs.wakeMode(), i -> prefs.put("wake", i)));
         root.addView(text("Например: «Через время» + «Одиночным тапом» — тапнул сзади, показало и "
                 + "погасло через заданное время.", 12, false));
-
-        header("Слайд-шоу");
-        slideLabel = text("", 14, false);
-        root.addView(slideLabel);
-        root.addView(seek(297, prefs.slideSec() - 3, i -> { prefs.put("slide", i + 3); refresh(); }));
 
         header("Яркость");
         blLabel = text("", 14, false);
@@ -162,6 +166,10 @@ public class MainActivity extends Activity {
     private void refresh() {
         if (status == null) return;
         status.setText(prefs.running() ? "● Показ идёт" : "○ Задний экран у Blackview");
+        int mode = prefs.mode();
+        appSec.setVisibility(mode == Prefs.MODE_APP ? View.VISIBLE : View.GONE);
+        visSec.setVisibility(mode == Prefs.MODE_VIS ? View.VISIBLE : View.GONE);
+        mediaSec.setVisibility(mode == Prefs.MODE_MEDIA ? View.VISIBLE : View.GONE);
         sensLabel.setText("Чувствительность: " + prefs.visSensitivity());
         fillApps();
         dpiLabel.setText("Плотность: " + prefs.dpi() + " dpi");
@@ -323,7 +331,10 @@ public class MainActivity extends Activity {
         return t;
     }
 
+    private String lastHeader = "";
+
     private void header(String s) {
+        lastHeader = s;
         TextView t = text(s, 17, true);
         t.setPadding(0, dp(18), 0, dp(4));
         root.addView(t);
@@ -346,17 +357,31 @@ public class MainActivity extends Activity {
 
     interface IntCb { void on(int i); }
 
-    private RadioGroup radios(String[] items, int checked, IntCb cb) {
-        RadioGroup g = new RadioGroup(this);
-        for (int i = 0; i < items.length; i++) {
-            RadioButton r = new RadioButton(this);
-            r.setText(items[i]);
-            r.setId(1000 + i);
-            g.addView(r);
-        }
-        g.check(1000 + checked);
-        g.setOnCheckedChangeListener((gr, id) -> cb.on(id - 1000));
-        return g;
+    private LinearLayout section() {
+        LinearLayout l = new LinearLayout(this);
+        l.setOrientation(LinearLayout.VERTICAL);
+        page.addView(l);
+        return l;
+    }
+
+    /** One line with the current choice; tap opens the list (instead of a long radio list). */
+    private View radios(String[] items, int checked, IntCb cb) {
+        final String title = lastHeader;
+        final int[] cur = {Math.max(0, Math.min(items.length - 1, checked))};
+        Button b = new Button(this);
+        b.setAllCaps(false);
+        b.setGravity(android.view.Gravity.START | android.view.Gravity.CENTER_VERTICAL);
+        b.setText(items[cur[0]] + "   ▾");
+        b.setOnClickListener(v -> new android.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setSingleChoiceItems(items, cur[0], (d, k) -> {
+                    cur[0] = k;
+                    b.setText(items[k] + "   ▾");
+                    d.dismiss();
+                    cb.on(k);
+                })
+                .show());
+        return b;
     }
 
     private SeekBar seek(int max, int value, IntCb cb) {

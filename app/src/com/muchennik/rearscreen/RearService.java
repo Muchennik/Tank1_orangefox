@@ -217,9 +217,10 @@ public class RearService extends Service {
                     continue;
                 }
                 blackSent = false;
+                if (v != null && v.src != prefs.visSource()) { v.close(); v = null; } // source changed live
                 if (v == null) {
                     try {
-                        v = new VisSource(prefs.visSource(), prefs.visStyle(), prefs.visSensitivity());
+                        v = new VisSource(prefs.visSource());
                     } catch (Exception e) {
                         Log.e(TAG, "vis", e);
                         toast("Эквалайзер: " + e.getMessage());
@@ -227,7 +228,7 @@ public class RearService extends Service {
                         return;
                     }
                 }
-                v.render(frame);
+                v.render(frame, prefs.visStyle(), prefs.visSensitivity());
                 writeFrame(frame);
                 int d = v.delayMs();
                 if (d > 0) Thread.sleep(d);
