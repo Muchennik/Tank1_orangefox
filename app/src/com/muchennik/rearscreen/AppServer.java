@@ -52,6 +52,12 @@ public final class AppServer {
     private static long downTime;
 
     public static void main(String[] args) throws Exception {
+        if (args.length == 2 && "--tweak".equals(args[0])) {
+            // second pass as root (uid 0 passes the permission checks shell fails)
+            displayId = Integer.parseInt(args[1]);
+            windowManagerTweaks();
+            return;
+        }
         String pkg = args.length > 0 ? args[0] : "com.android.chrome";
         boolean imeLocal = args.length < 2 || "local".equals(args[1]);
         int dpi = args.length > 2 ? Integer.parseInt(args[2]) : 140;

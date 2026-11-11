@@ -276,6 +276,22 @@ public class RearService extends Service {
                 String l;
                 while ((l = r.readLine()) != null) {
                     Log.i(TAG, "app: " + l);
+                    if (l.startsWith("I display ")) {
+                        // repeat the window-manager tweaks as root: no nav bar, IME on the main screen
+                        String id = l.substring(10).trim();
+                        new Thread(() -> {
+                            try {
+                                Process t = Runtime.getRuntime().exec(new String[] {"su", "-c",
+                                        "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " --tweak " + id});
+                                try (BufferedReader tr = new BufferedReader(new InputStreamReader(t.getErrorStream()))) {
+                                    String tl;
+                                    while ((tl = tr.readLine()) != null) Log.i(TAG, "root tweak: " + tl);
+                                }
+                            } catch (Exception e) {
+                                Log.w(TAG, "root tweak: " + e);
+                            }
+                        }, "rear-tweak").start();
+                    }
                     if (l.startsWith("E ") || l.contains("Exception")) toast("Приложение сзади: " + l);
                 }
             } catch (Exception ignored) {}
