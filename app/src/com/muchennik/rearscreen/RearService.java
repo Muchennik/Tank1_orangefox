@@ -131,6 +131,11 @@ public class RearService extends Service {
     /** Touch release on the rear screen: double tap detection. */
     private void onTap(int x, int y) {
         long now = SystemClock.uptimeMillis();
+        if (!awake && prefs.wakeMode() == Prefs.WAKE_TAP) { // a single tap wakes it
+            lastUp = 0;
+            wake();
+            return;
+        }
         boolean dbl = now - lastUp < 400 && Math.abs(x - lastUpX) < 60 && Math.abs(y - lastUpY) < 60;
         lastUp = dbl ? 0 : now;
         lastUpX = x;
@@ -138,7 +143,7 @@ public class RearService extends Service {
         if (!dbl) return;
         int mode = prefs.offMode();
         if (!awake) {
-            if (prefs.wakeOnDoubleTap()) wake();
+            if (prefs.wakeMode() == Prefs.WAKE_DOUBLE_TAP) wake();
         } else if (mode == Prefs.OFF_DOUBLE_TAP || mode == Prefs.OFF_NEVER) {
             main.post(this::stopAll);
         } else {
@@ -161,7 +166,7 @@ public class RearService extends Service {
         awake = false;
         backlight(0);
         if (wl != null && wl.isHeld()) wl.release();
-        if (!prefs.wakeOnDoubleTap() && prefs.offMode() != Prefs.OFF_SCREEN) main.post(this::stopAll);
+        if (!prefs.canWake() && prefs.offMode() != Prefs.OFF_SCREEN) main.post(this::stopAll);
     }
 
     private void backlight(int v) {

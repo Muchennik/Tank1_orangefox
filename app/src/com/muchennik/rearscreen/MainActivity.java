@@ -9,7 +9,6 @@ import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CheckBox;
 import android.widget.LinearLayout;
 import android.widget.RadioButton;
 import android.widget.RadioGroup;
@@ -70,11 +69,12 @@ public class MainActivity extends Activity {
             prefs.put("timer", TIMER_STEPS[i]);
             refresh();
         }));
-        CheckBox wake = new CheckBox(this);
-        wake.setText("Включать снова двойным тапом по заднему экрану");
-        wake.setChecked(prefs.wakeOnDoubleTap());
-        wake.setOnCheckedChangeListener((c, on) -> prefs.put("wake_dt", on));
-        root.addView(wake);
+        header("Как включать снова (когда погасло)");
+        root.addView(radios(new String[] {"Никак (погасло — экран отдаётся Blackview)",
+                        "Одиночным тапом по заднему экрану", "Двойным тапом по заднему экрану"},
+                prefs.wakeMode(), i -> prefs.put("wake", i)));
+        root.addView(text("Например: «Через время» + «Одиночным тапом» — тапнул сзади, показало и "
+                + "погасло через заданное время.", 12, false));
 
         header("Слайд-шоу");
         slideLabel = text("", 14, false);

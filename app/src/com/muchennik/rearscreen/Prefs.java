@@ -34,7 +34,10 @@ final class Prefs {
     int timerSec() { return sp.getInt("timer", 30); }
     int slideSec() { return sp.getInt("slide", 10); }
     int brightness() { return sp.getInt("bl", 12); }
-    boolean wakeOnDoubleTap() { return sp.getBoolean("wake_dt", true); }
+    /** how a sleeping (black) rear screen wakes up */
+    static final int WAKE_NONE = 0, WAKE_TAP = 1, WAKE_DOUBLE_TAP = 2;
+    int wakeMode() { return sp.getInt("wake", sp.getBoolean("wake_dt", true) ? WAKE_DOUBLE_TAP : WAKE_NONE); }
+    boolean canWake() { return wakeMode() != WAKE_NONE; }
     boolean running() { return sp.getBoolean("running", false); }
 
     void put(String k, int v) { sp.edit().putInt(k, v).apply(); }
