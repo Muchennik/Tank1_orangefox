@@ -39,7 +39,7 @@ PRODUCT_SOONG_NAMESPACES += \
 
 # Properties for recovery
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.vendor.build.security_patch=2025-08-05 \
+    ro.vendor.build.security_patch=2026-08-05 \
     ro.crypto.dm_default_key.options_format.version=2 \
     ro.crypto.volume.filenames_mode=aes-256-cts \
     ro.crypto.volume.metadata.method=dm-default-key \

@@ -125,11 +125,11 @@ AB_OTA_PARTITIONS += \
 BOARD_AVB_ENABLE := true
 
 # Security patch / version must match stock so KeyMint accepts key blobs.
-# Update together with the stock firmware version!
-PLATFORM_VERSION := 15
-PLATFORM_SECURITY_PATCH := 2025-08-05
-VENDOR_SECURITY_PATCH := 2025-08-05
-BOOT_SECURITY_PATCH := 2025-08-05
+# Update together with the stock firmware version! (TANK_1_S1_260903: Android 16, 2026-08-05)
+PLATFORM_VERSION := 16
+PLATFORM_SECURITY_PATCH := 2026-08-05
+VENDOR_SECURITY_PATCH := 2026-08-05
+BOOT_SECURITY_PATCH := 2026-08-05
 
 # Recovery
 TARGET_RECOVERY_FSTAB := $(DEVICE_PATH)/recovery/root/system/etc/recovery.fstab
