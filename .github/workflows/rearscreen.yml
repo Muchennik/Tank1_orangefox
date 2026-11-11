@@ -1,0 +1,51 @@
+name: Rear Screen app
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tools-rearscreen]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Native helper (NDK)
+        run: |
+          set -e
+          NDK="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          CC="$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/aarch64-linux-android30-clang"
+          mkdir -p out/assets
+          "$CC" -O2 -Wall -Wextra -Werror -o out/assets/rearhelper native/rearhelper.c
+          "$NDK/toolchains/llvm/prebuilt/linux-x86_64/bin/llvm-strip" out/assets/rearhelper
+          file out/assets/rearhelper
+
+      - name: APK
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | grep -E "android-3[0-6]$" | sort -V | tail -1)
+          echo "build-tools $BT, platform $PLAT"
+          mkdir -p out/classes out/dex
+          "$BT/aapt2" link -o out/base.apk --manifest app/AndroidManifest.xml -I "$PLAT/android.jar" -A out/assets
+          javac --release 11 -Xlint:-options -cp "$PLAT/android.jar" -d out/classes $(find app/src -name '*.java')
+          "$BT/d8" --release --min-api 30 --lib "$PLAT/android.jar" --output out/dex $(find out/classes -name '*.class')
+          (cd out/dex && zip -q ../base.apk classes.dex)
+          "$BT/zipalign" -f -p 4 out/base.apk out/aligned.apk
+          "$BT/apksigner" sign --ks app/rearscreen.jks --ks-pass pass:rearscreen --key-pass pass:rearscreen \
+            --out RearScreen.apk out/aligned.apk
+          "$BT/apksigner" verify RearScreen.apk
+          "$BT/aapt2" dump badging RearScreen.apk | head -3
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=rearscreen-${{ github.run_number }}
+          gh release create "$TAG" RearScreen.apk --target "$GITHUB_SHA" \
+            --title "Rear Screen (Oscal Tank 1) #${{ github.run_number }}" \
+            --notes "Media (photo / GIF / video) on the Oscal Tank 1 rear display. Needs root (Magisk)."
