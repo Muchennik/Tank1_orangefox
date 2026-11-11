@@ -22,9 +22,9 @@ import android.util.Log;
 final class VisSource {
     static final int SRC_MIC = 0, SRC_OUT = 1;
     static final String[] STYLES = {"Столбики с пиками", "Зеркальные (от центра)", "Осциллограф (волна)",
-            "Круг", "Водопад (спектрограмма)", "LED-матрица", "Горы (заливка)"};
+            "Круг", "Водопад (спектрограмма)", "LED-матрица", "Горы (заливка)", "Пламя по кругу"};
     static final int STYLE_BARS = 0, STYLE_MIRROR = 1, STYLE_WAVE = 2, STYLE_CIRCLE = 3, STYLE_WATERFALL = 4,
-            STYLE_LED = 5, STYLE_AREA = 6;
+            STYLE_LED = 5, STYLE_AREA = 6, STYLE_FLAME = 7;
     private static final int N = 1024, HI = 60, LO = 20, RATE = 44100;
 
     final int src;
@@ -132,6 +132,7 @@ final class VisSource {
             case STYLE_WATERFALL: waterfall(); break;
             case STYLE_LED: led(); break;
             case STYLE_AREA: area(); break;
+            case STYLE_FLAME: flame(); break;
             default: bars(false); break;
         }
         Frames.fromBitmap(bmp, frame);
@@ -258,6 +259,78 @@ final class VisSource {
         paint.setStrokeWidth(2);
         paint.setColor(Color.WHITE);
         canvas.drawPath(p, paint);
+        paint.setStyle(Paint.Style.FILL);
+    }
+
+    private float rot = -60, bassAvg;
+
+    /** value of the 60-band spectrum at fractional position t (0 = bass .. 1 = treble) */
+    private float at(float t) {
+        float f = Math.max(0, Math.min(HI - 1.001f, t * (HI - 1)));
+        int i = (int) f;
+        return hi[i] + (hi[i + 1] - hi[i]) * (f - i);
+    }
+
+    /**
+     * Poweramp-like "flame ring": dark disc with a glow, two point-symmetric arcs of jagged
+     * spectrum; the bass end of each arc leans back into a long diagonal spike. Orange.
+     */
+    private void flame() {
+        float cx = Frames.W / 2f, cy = Frames.H / 2f;
+        float bass = (hi[0] + hi[1] + hi[2] + hi[3] + hi[4]) / 5;
+        bassAvg = bassAvg * 0.9f + bass * 0.1f;
+        float kick = Math.max(0, bass - bassAvg);
+        rot += 0.35f + kick * 6;            // slow spin, jumps on beats
+        float r0 = 40 + bass * 6;
+        // glow inside the disc
+        paint.setShader(new android.graphics.RadialGradient(cx, cy, r0 * 1.05f,
+                new int[] {Color.argb((int) (120 + 120 * bass), 255, 110, 30), Color.argb(60, 160, 40, 10), Color.argb(0, 0, 0, 0)},
+                new float[] {0, 0.55f, 1}, Shader.TileMode.CLAMP));
+        canvas.drawCircle(cx, cy, r0 * 1.05f, paint);
+        paint.setShader(null);
+
+        int K = 110;                        // points per arc
+        float span = 150;                   // degrees per arc
+        for (int arc = 0; arc < 2; arc++) {
+            float start = rot + arc * 180;
+            Path outer = new Path(), inner = new Path();
+            float[] bx = new float[K], by = new float[K];
+            for (int k = 0; k < K; k++) {
+                float t = k / (float) (K - 1);
+                // jagged: neighbouring points sample slightly different bands
+                float v = at(t * 0.85f) * (0.75f + 0.25f * (float) Math.abs(Math.sin(k * 2.7 + rot * 0.05)));
+                float boost = 1 + 2.2f * (float) Math.pow(1 - t, 3); // bass end is the long spike
+                float len = 3 + v * 60 * boost;
+                double a = Math.toRadians(start + t * span);
+                double lean = Math.toRadians(-70 * Math.pow(1 - t, 2.5)); // bass leans back (tangent-ish)
+                float ex = (float) Math.cos(a), ey = (float) Math.sin(a);
+                bx[k] = cx + ex * r0; by[k] = cy + ey * r0;
+                float dx = (float) Math.cos(a + lean), dy = (float) Math.sin(a + lean);
+                float tx = bx[k] + dx * len, ty = by[k] + dy * len;
+                if (k == 0) outer.moveTo(bx[k], by[k]);
+                outer.lineTo(tx, ty);
+                // faint mirrored echo inside the disc
+                float il = Math.min(r0 * 0.55f, len * 0.35f);
+                float ix = bx[k] - ex * il, iy = by[k] - ey * il;
+                if (k == 0) inner.moveTo(bx[k], by[k]);
+                inner.lineTo(ix, iy);
+            }
+            for (int k = K - 1; k >= 0; k--) { outer.lineTo(bx[k], by[k]); inner.lineTo(bx[k], by[k]); }
+            outer.close();
+            inner.close();
+            paint.setShader(new android.graphics.RadialGradient(cx, cy, r0 + 90,
+                    new int[] {0xFFFFC27A, 0xFFFF8A2A, 0xFFFF5A12, 0xFFD43A00},
+                    new float[] {r0 / (r0 + 90), (r0 + 12) / (r0 + 90), (r0 + 40) / (r0 + 90), 1}, Shader.TileMode.CLAMP));
+            canvas.drawPath(outer, paint);
+            paint.setShader(null);
+            paint.setColor(0x55FF7A2A);
+            canvas.drawPath(inner, paint);
+        }
+        // thin dark rim keeps the disc edge crisp
+        paint.setStyle(Paint.Style.STROKE);
+        paint.setStrokeWidth(1.5f);
+        paint.setColor(0x66000000);
+        canvas.drawCircle(cx, cy, r0, paint);
         paint.setStyle(Paint.Style.FILL);
     }
 

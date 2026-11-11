@@ -74,11 +74,17 @@ public class MainActivity extends Activity {
 
         // ---- mode tiles
         page.addView(label("РЕЖИМ"));
-        LinearLayout tiles = new LinearLayout(this);
-        tiles.setOrientation(LinearLayout.HORIZONTAL);
+        LinearLayout tiles = column();
+        LinearLayout tileRow = null;
         String[][] modes = {{"▣", "Медиа", "фото · GIF · видео"}, {"⠿", "Приложения", "иконки сзади"},
-                {"▁▃▆", "Эквалайзер", "звук"}};
+                {"▁▃▆", "Эквалайзер", "звук"}, {"◔", "Монитор", "ЦП · ОЗУ · батарея"}};
         for (int i = 0; i < modes.length; i++) {
+            if (i % 2 == 0) {
+                tileRow = new LinearLayout(this);
+                LinearLayout.LayoutParams rp = new LinearLayout.LayoutParams(-1, -2);
+                if (i > 0) rp.topMargin = dp(10);
+                tiles.addView(tileRow, rp);
+            }
             final int m = i;
             View t = modeTile(modes[i][0], modes[i][1], modes[i][2], v -> {
                 prefs.put("mode", m);
@@ -86,9 +92,9 @@ public class MainActivity extends Activity {
                 refresh();
                 live();
             });
-            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(104), 1);
-            if (i > 0) lp.leftMargin = dp(10);
-            tiles.addView(t, lp);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0, dp(96), 1);
+            if (i % 2 == 1) lp.leftMargin = dp(10);
+            tileRow.addView(t, lp);
             modeTiles.add(t);
         }
         page.addView(tiles);
@@ -272,7 +278,7 @@ public class MainActivity extends Activity {
         startBtn.setText(on ? "Остановить" : "Запустить");
         startBtn.setTextColor(on ? TEXT : Color.WHITE);
         startBtn.setBackground(ripple(on ? round(CARD2, dp(24), LINE, dp(1)) : round(ACCENT, dp(24), 0, 0)));
-        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆"}[mode]);
+        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆", "◔"}[Math.min(3, mode)]);
         previewGlyph.setTextColor(on ? ACCENT : 0xFF3A3F4A);
         for (int i = 0; i < modeTiles.size(); i++) {
             boolean sel = i == mode;

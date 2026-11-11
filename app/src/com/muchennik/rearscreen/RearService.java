@@ -191,7 +191,10 @@ public class RearService extends Service {
         modeShown = m;
         appMode = m == Prefs.MODE_APP;
         if (appMode) startApp();
-        else if (m == Prefs.MODE_VIS) {
+        else if (m == Prefs.MODE_STATS) {
+            renderThread = new Thread(this::statsLoop, "rear-stats");
+            renderThread.start();
+        } else if (m == Prefs.MODE_VIS) {
             renderThread = new Thread(this::visLoop, "rear-vis");
             renderThread.start();
         } else {
@@ -283,6 +286,37 @@ public class RearService extends Service {
             if (running) Log.e(TAG, "vis loop", e);
         } finally {
             if (v != null) v.close();
+        }
+    }
+
+    /** System monitor: one frame per second. */
+    private void statsLoop() {
+        byte[] frame = new byte[Frames.SIZE];
+        byte[] black = new byte[Frames.SIZE];
+        StatsSource st = null;
+        boolean blackSent = false;
+        final int g = gen;
+        try {
+            while (running && g == gen) {
+                if (awake && prefs.offMode() == Prefs.OFF_TIMER
+                        && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
+                if (!awake) {
+                    if (!blackSent) { writeFrame(black); blackSent = true; }
+                    Thread.sleep(150);
+                    continue;
+                }
+                blackSent = false;
+                if (st == null) st = new StatsSource(this);
+                long t0 = SystemClock.uptimeMillis();
+                st.render(frame);
+                writeFrame(frame);
+                long left = 1000 - (SystemClock.uptimeMillis() - t0);
+                for (; left > 0 && awake && running && g == gen; left -= 100) Thread.sleep(Math.min(100, left));
+            }
+        } catch (Exception e) {
+            if (running) { Log.e(TAG, "stats", e); toast("Монитор: " + e.getMessage()); }
+        } finally {
+            if (st != null) st.close();
         }
     }
 
@@ -588,6 +622,8 @@ public class RearService extends Service {
                     new Intent(this, RearService.class).setAction(ACTION_MENU), PendingIntent.FLAG_IMMUTABLE)).build());
         } else if (new Prefs(this).mode() == Prefs.MODE_VIS) {
             b.setContentText("Эквалайзер");
+        } else if (new Prefs(this).mode() == Prefs.MODE_STATS) {
+            b.setContentText("Монитор системы");
         }
         return b.build();
     }

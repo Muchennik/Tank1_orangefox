@@ -41,7 +41,7 @@ final class Prefs {
     boolean running() { return sp.getBoolean("running", false); }
 
     /** what the rear screen shows */
-    static final int MODE_MEDIA = 0, MODE_APP = 1, MODE_VIS = 2;
+    static final int MODE_MEDIA = 0, MODE_APP = 1, MODE_VIS = 2, MODE_STATS = 3;
     int mode() { return sp.getInt("mode", MODE_MEDIA); }
     String appPackage() { return sp.getString("app_pkg", "com.android.chrome"); }
     String appLabel() { return sp.getString("app_label", "Chrome"); }
