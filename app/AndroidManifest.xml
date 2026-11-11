@@ -4,8 +4,8 @@
      Everything it receives is forwarded to Google Photos. -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.blackview.photos.gallery"
-    android:versionCode="2100000000"
-    android:versionName="redirect-1">
+    android:versionCode="2100000001"
+    android:versionName="redirect-2">
     <uses-sdk android:minSdkVersion="30" android:targetSdkVersion="34" />
     <application android:label="Gallery → Google Photos" android:hasCode="true">
         <activity android:name="com.muchennik.galleryredirect.Redirect"

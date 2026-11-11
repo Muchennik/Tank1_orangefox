@@ -43,14 +43,14 @@ jobs:
           curl -fsSL -o $M/META-INF/com/google/android/update-binary \
             https://raw.githubusercontent.com/topjohnwu/Magisk/master/scripts/module_installer.sh
           printf '#MAGISK\n' > $M/META-INF/com/google/android/updater-script
-          (cd $M && zip -qr ../../tank_gallery_redirect_v1.zip .)
-          unzip -l tank_gallery_redirect_v1.zip
+          (cd $M && zip -qr ../../tank_gallery_redirect_v2.zip .)
+          unzip -l tank_gallery_redirect_v2.zip
 
       - name: Publish release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG=gallery-redirect-${{ github.run_number }}
-          gh release create "$TAG" tank_gallery_redirect_v1.zip --target "$GITHUB_SHA" \
+          gh release create "$TAG" tank_gallery_redirect_v2.zip --target "$GITHUB_SHA" \
             --title "Tank 1: camera thumbnails -> Google Photos (Magisk module) #${{ github.run_number }}" \
             --notes "Magisk module. Replaces com.blackview.photos.gallery (/system/app/DKMimediaGallery) with a stub that opens camera photos in Google Photos. Disable/remove the module to restore the stock gallery."
