@@ -108,7 +108,12 @@ public final class AppServer {
         displayId = vd.getDisplay().getDisplayId();
         log("I display " + displayId);
 
-        sh("wm set-display-ime-policy " + displayId + " fallback");
+        // DokeOS / Android 16 still adds a navigation bar, the secondary launcher and freeform
+        // (desktop) windowing to a trusted virtual display, and this build has no
+        // "wm set-display-ime-policy": switch all of it off through IWindowManager directly
+        windowManagerTweaks();
+        log("I settings: force_desktop=" + shOut("settings get global force_desktop_mode_on_external_displays").trim()
+                + " freeform=" + shOut("settings get global enable_freeform_support").trim());
         initInput();
         launch(pkg);
 
@@ -179,6 +184,38 @@ public final class AppServer {
             return new AttributionSource.Builder(android.os.Process.myUid()).setPackageName(SHELL).build();
         }
         @Override public Context getApplicationContext() { return this; }
+    }
+
+    @SuppressLint("PrivateApi")
+    private static void windowManagerTweaks() {
+        Object wm;
+        try {
+            Class<?> sm = Class.forName("android.os.ServiceManager");
+            Object binder = sm.getMethod("getService", String.class).invoke(null, "window");
+            Class<?> stub = Class.forName("android.view.IWindowManager$Stub");
+            wm = stub.getMethod("asInterface", android.os.IBinder.class).invoke(null, binder);
+        } catch (Exception e) {
+            log("E IWindowManager: " + e);
+            return;
+        }
+        call(wm, "setShouldShowSystemDecors", displayId, false);   // no nav bar / launcher / gestures
+        call(wm, "setDisplayImePolicy", displayId, 1);              // DISPLAY_IME_POLICY_FALLBACK_DISPLAY
+        call(wm, "setWindowingMode", displayId, 1);                 // WINDOWING_MODE_FULLSCREEN
+    }
+
+    private static void call(Object target, String name, Object... args) {
+        for (Method m : target.getClass().getMethods()) {
+            if (!m.getName().equals(name) || m.getParameterTypes().length != args.length) continue;
+            try {
+                Object r = m.invoke(target, args);
+                log("I " + name + " ok" + (r != null ? " -> " + r : ""));
+            } catch (Exception e) {
+                Throwable c = e.getCause() != null ? e.getCause() : e;
+                log("E " + name + ": " + c);
+            }
+            return;
+        }
+        log("E " + name + ": no such method");
     }
 
     private static void initInput() throws Exception {
