@@ -159,7 +159,7 @@ jobs:
             ```
             fastboot flash vendor_boot ${{ env.IMG_NAME }}
             ```
-            It is the STOCK vendor_boot (V1.2.0.1_S250917) with only the recovery fragment replaced.
+            It is the STOCK vendor_boot (TANK_1_S1_260903 (Android 16)) with only the recovery fragment replaced.
             Normal Android boot is not affected. Do NOT touch vbmeta.
             Rollback: flash stock vendor_boot from `stock/vendor_boot.img.xz` (unpack with `xz -d`).
           files: |
