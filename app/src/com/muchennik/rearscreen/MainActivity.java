@@ -52,11 +52,7 @@ public class MainActivity extends Activity {
         appLabel = text("", 14, false);
         root.addView(appLabel);
         root.addView(button("Выбрать приложение", v -> pickApp()));
-        android.widget.CheckBox ime = new android.widget.CheckBox(this);
-        ime.setText("Клавиатура на заднем экране (иначе — на основном)");
-        ime.setChecked(prefs.imeOnRear());
-        ime.setOnCheckedChangeListener((cb, on) -> prefs.put("ime_rear", on));
-        root.addView(ime);
+        root.addView(text("Клавиатура открывается на основном экране (на заднем она занимала бы весь экран).", 12, false));
         dpiLabel = text("", 14, false);
         root.addView(dpiLabel);
         root.addView(seek(140, prefs.dpi() - 100, i -> { prefs.put("dpi", i + 100); refresh(); }));

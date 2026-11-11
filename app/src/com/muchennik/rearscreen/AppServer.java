@@ -93,8 +93,11 @@ public final class AppServer {
             }
         }, new Handler(ht.getLooper()));
 
+        // no SHOULD_SHOW_SYSTEM_DECORATIONS: with it SystemUI adds a navigation bar and back gesture
+        // (which close the app) and Android 16 forces desktop windows with a caption bar; the
+        // keyboard then opens on the main screen (normal size), which is also easier to type on
         int flags = PUBLIC | OWN_CONTENT_ONLY | SUPPORTS_TOUCH | ROTATES_WITH_CONTENT
-                | DESTROY_CONTENT_ON_REMOVAL | SHOULD_SHOW_SYSTEM_DECORATIONS | TRUSTED
+                | DESTROY_CONTENT_ON_REMOVAL | TRUSTED
                 | OWN_DISPLAY_GROUP | ALWAYS_UNLOCKED | TOUCH_FEEDBACK_DISABLED;
         // no OWN_FOCUS: a touch on the rear display makes it the focused display, otherwise focus
         // jumps back to the main display and the keyboard closes right after opening
@@ -105,9 +108,23 @@ public final class AppServer {
         displayId = vd.getDisplay().getDisplayId();
         log("I display " + displayId);
 
-        sh("wm set-display-ime-policy " + displayId + (imeLocal ? " local" : " fallback"));
+        sh("wm set-display-ime-policy " + displayId + " fallback");
         initInput();
         launch(pkg);
+
+        // relaunch the app if it gets closed (it would leave the rear screen black)
+        Thread watch = new Thread(() -> {
+            while (true) {
+                try { Thread.sleep(3000); } catch (InterruptedException e) { return; }
+                String tasks = shOut("am stack list");
+                if (!tasks.contains("displayId=" + displayId)) {
+                    log("I app closed, relaunching");
+                    launch(pkg);
+                }
+            }
+        }, "watch");
+        watch.setDaemon(true);
+        watch.start();
 
         Thread in = new Thread(() -> {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(System.in))) {
