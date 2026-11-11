@@ -47,3 +47,12 @@ FBE v2 + шифрование метаданных. TEE — TrustKernel (KeyMint
 ## Сборка
 
 Actions → **Build OrangeFox (OSCAL TANK 1)** → Run workflow. Готовый образ появится в Releases.
+
+## Stock firmware packages (SP Flash Tool)
+
+| Build | Android | Package | Link |
+|---|---|---|---|
+| TANK_1_S1_250917 (RU) | 15 | `F252_DK_DK100C_8791_V0_RU_V1.2.0.1_S250917.zip`, 4 973 803 258 bytes | https://mega.nz/file/KOpAiSIA#89njyNivkIxLVUw8eKlg2tA7VhagoaCWmUu5Zdh_4eE |
+| TANK_1_S1_260903 (RU) | 16 | not available yet | — |
+
+Phones updated over the air to 260903 (Android 16) must not be flashed back to 250917 (possible anti-rollback).
