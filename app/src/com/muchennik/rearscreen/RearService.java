@@ -78,6 +78,9 @@ public class RearService extends Service {
                 if (prefs.media().isEmpty()) throw new IllegalStateException("не выбраны файлы");
                 helper = Root.helper(this);
                 Root.blackviewUi(false);
+                // DKSystemUI reacts to the switch a moment later and turns the panel off
+                // (closeViceScreen): wait for it, then the helper turns the panel on again
+                Thread.sleep(2000);
                 proc = Runtime.getRuntime().exec(new String[] {"su", "-c", helper + " serve"});
                 frames = proc.getOutputStream();
                 running = true;
@@ -148,7 +151,10 @@ public class RearService extends Service {
         awake = true;
         awakeSince = SystemClock.uptimeMillis();
         slideSince = awakeSince;
-        backlight(prefs.brightness());
+        String h = helper;
+        int bl = prefs.brightness();
+        // panel on (display on + sleep out) before the backlight, every time we wake up
+        if (h != null) new Thread(() -> Root.run(h + " on && " + h + " bl " + bl)).start();
         if (wl != null && !wl.isHeld()) wl.acquire();
     }
 
