@@ -127,25 +127,23 @@ static int serve(void) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     power(1);
     pthread_create(&t, NULL, touch_thread, NULL);
-    int fd = open(DEV, O_RDWR);
-    if (fd < 0) {
-        printf("E open %s: %s\n", DEV, strerror(errno));
-        return 1;
-    }
     printf("I serve ready %dx%d\n", W, H);
     fflush(stdout);
+    long n = 0;
     while (read_full(buf, FRAME)) {
-        if (ioctl(fd, IOC_FRAME, buf) < 0) {
-            /* the driver may have been reset: reopen once */
-            close(fd);
-            fd = open(DEV, O_RDWR);
-            if (fd < 0 || ioctl(fd, IOC_FRAME, buf) < 0) {
-                printf("E frame: %s\n", strerror(errno));
-                fflush(stdout);
-            }
+        /* exactly like libbv_vicescreenround.so: open / ioctl / close for every frame
+           (keeping the node open makes the SPI transfer hang in this driver) */
+        struct timespec a, b;
+        clock_gettime(CLOCK_MONOTONIC, &a);
+        int r = lcd_ioctl(IOC_FRAME, buf);
+        clock_gettime(CLOCK_MONOTONIC, &b);
+        n++;
+        if (r < 0 || n <= 3 || n % 300 == 0) {
+            long ms = (b.tv_sec - a.tv_sec) * 1000 + (b.tv_nsec - a.tv_nsec) / 1000000;
+            printf("%s frame %ld: ret=%d (%s) %ld ms\n", r < 0 ? "E" : "I", n, r, r < 0 ? strerror(-r > 0 ? -r : errno) : "ok", ms);
+            fflush(stdout);
         }
     }
-    close(fd);
     return 0; /* touch grab is released when the process exits */
 }
 
