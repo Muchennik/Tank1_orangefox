@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
 
         header("Когда гаснет");
         root.addView(radios(new String[] {"Через время", "Вместе с основным экраном",
-                        "По двойному тапу сзади", "Никогда (только двойной тап / Стоп)"},
+                        "По двойному тапу сзади", "Никогда (только кнопкой «Стоп»)"},
                 prefs.offMode(), i -> { prefs.put("off", i); refresh(); }));
         timerLabel = text("", 14, false);
         root.addView(timerLabel);
@@ -120,8 +120,8 @@ public class MainActivity extends Activity {
             status.postDelayed(this::refresh, 800);
         }));
         root.addView(ctl);
-        root.addView(text("Двойной тап сзади: погасить (или выключить в режимах «по двойному тапу» и "
-                + "«никогда»). Плитка «Задний экран» в шторке включает и выключает показ.\n\n"
+        root.addView(text("Двойной тап сзади гасит картинку (в режиме «Медиа»). Экран возвращается Blackview только "
+                + "кнопкой «Стоп» (здесь, в уведомлении или плиткой «Задний экран» в шторке).\n\n"
                 + "Кнопка «Показать» запускает выбранный режим: медиа или приложение.",
                 12, false));
         refresh();

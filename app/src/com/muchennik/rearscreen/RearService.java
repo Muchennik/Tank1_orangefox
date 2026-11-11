@@ -156,11 +156,10 @@ public class RearService extends Service {
         lastUpX = x;
         lastUpY = y;
         if (!dbl) return;
-        int mode = prefs.offMode();
+        // double tap only puts the picture out; the screen goes back to Blackview only with
+        // "Стоп" or when there is no way to wake it up again (handled in sleep())
         if (!awake) {
             if (prefs.wakeMode() == Prefs.WAKE_DOUBLE_TAP) wake();
-        } else if (mode == Prefs.OFF_DOUBLE_TAP || mode == Prefs.OFF_NEVER) {
-            main.post(this::stopAll);
         } else {
             sleep();
         }
