@@ -141,6 +141,8 @@ jobs:
 
       - name: Upload debug artifacts
         if: always()
+        # the artifact service is flaky; it must never block the release
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: debug-${{ github.run_number }}
