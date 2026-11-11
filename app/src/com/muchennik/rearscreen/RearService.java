@@ -179,8 +179,16 @@ public class RearService extends Service {
             while (running) {
                 List<String> media = prefs.media();
                 long now = SystemClock.uptimeMillis();
-                if (media.isEmpty()) { // list cleared while running: black, wait for new files
-                    if (src != null) { src.close(); src = null; srcKey = null; }
+                if (media.isEmpty() && src != null && awake) {
+                    // list cleared while running: keep showing the last file until new ones come
+                    src.render(frame);
+                    frames.write(frame);
+                    frames.flush();
+                    blackSent = false;
+                    Thread.sleep(src.delayMs());
+                    continue;
+                }
+                if (media.isEmpty()) { // nothing shown yet: black, wait for files
                     if (!blackSent) {
                         frames.write(black);
                         frames.flush();
