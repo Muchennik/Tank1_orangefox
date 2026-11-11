@@ -160,7 +160,7 @@ public class RearService extends Service {
         // "Стоп" or when there is no way to wake it up again (handled in sleep())
         if (!awake) {
             if (prefs.wakeMode() == Prefs.WAKE_DOUBLE_TAP) wake();
-        } else {
+        } else if (prefs.offMode() != Prefs.OFF_NEVER) { // "never" really never goes out
             sleep();
         }
     }
