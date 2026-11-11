@@ -29,7 +29,8 @@ import java.util.List;
  * plays the playlist and applies the "when does it go out" rules.
  */
 public class RearService extends Service {
-    static final String ACTION_START = "start", ACTION_STOP = "stop", ACTION_BRIGHTNESS = "bl";
+    static final String ACTION_START = "start", ACTION_STOP = "stop", ACTION_BRIGHTNESS = "bl",
+            ACTION_BACK = "back", ACTION_HOME = "home";
     private static final String TAG = Root.TAG;
     private static final int NOTIF = 1;
 
@@ -46,6 +47,9 @@ public class RearService extends Service {
     private volatile long slideSince;
     private long lastUp, lastUpX, lastUpY;
     private PowerManager.WakeLock wl;
+    private Process appProc;          // AppServer (virtual display) in app mode
+    private OutputStream appCmd;
+    private volatile boolean appMode;
 
     private final BroadcastReceiver screen = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
@@ -62,6 +66,8 @@ public class RearService extends Service {
         String a = intent != null ? intent.getAction() : null;
         if (ACTION_STOP.equals(a)) {
             stopAll();
+        } else if (ACTION_BACK.equals(a) || ACTION_HOME.equals(a)) {
+            appCommand("KEY " + (ACTION_BACK.equals(a) ? 4 : 3));
         } else if (ACTION_BRIGHTNESS.equals(a)) {
             if (running && awake) backlight(prefs.brightness());
         } else if (!running) {
@@ -89,9 +95,13 @@ public class RearService extends Service {
                 wl = ((PowerManager) getSystemService(POWER_SERVICE))
                         .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "rearscreen:play");
                 index = 0;
+                appMode = prefs.mode() == Prefs.MODE_APP;
                 wake();
-                renderThread = new Thread(this::renderLoop, "rear-render");
-                renderThread.start();
+                if (appMode) startApp();
+                else {
+                    renderThread = new Thread(this::renderLoop, "rear-render");
+                    renderThread.start();
+                }
                 TileService.requestListeningState(this,
                         new android.content.ComponentName(this, RearTile.class));
             } catch (Exception e) {
@@ -114,6 +124,11 @@ public class RearService extends Service {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 String l;
                 while ((l = r.readLine()) != null) {
+                    if (appMode && (l.startsWith("D ") || l.startsWith("M ") || l.startsWith("U "))) {
+                        if (awake) appCommand(l);
+                        else if (l.startsWith("U ")) onTap(0, 0); // wake rules still apply
+                        continue;
+                    }
                     if (l.startsWith("U ")) {
                         String[] s = l.split(" ");
                         onTap(Integer.parseInt(s[1]), Integer.parseInt(s[2]));
@@ -249,6 +264,60 @@ public class RearService extends Service {
         }
     }
 
+    /** App mode: AppServer (shell uid, app_process) renders a virtual display; we relay its frames. */
+    private void startApp() throws Exception {
+        String apk = getApplicationInfo().sourceDir;
+        String cmd = "CLASSPATH=" + apk + " app_process /system/bin " + AppServer.class.getName() + " "
+                + prefs.appPackage() + " " + (prefs.imeOnRear() ? "local" : "fallback") + " " + prefs.dpi();
+        appProc = Runtime.getRuntime().exec(new String[] {"su", "2000", "-c", cmd});
+        appCmd = appProc.getOutputStream();
+        Process ap = appProc;
+        new Thread(() -> { // diagnostics
+            try (BufferedReader r = new BufferedReader(new InputStreamReader(ap.getErrorStream()))) {
+                String l;
+                while ((l = r.readLine()) != null) {
+                    Log.i(TAG, "app: " + l);
+                    if (l.startsWith("E ") || l.contains("Exception")) toast("Приложение сзади: " + l);
+                }
+            } catch (Exception ignored) {}
+        }, "rear-app-log").start();
+        new Thread(() -> { // frames: AppServer stdout -> helper stdin
+            byte[] f = new byte[Frames.SIZE];
+            byte[] black = new byte[Frames.SIZE];
+            boolean blackSent = false;
+            try (java.io.DataInputStream in = new java.io.DataInputStream(ap.getInputStream())) {
+                while (running) {
+                    in.readFully(f);
+                    if (prefs.offMode() == Prefs.OFF_TIMER && awake
+                            && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
+                    if (!awake) {
+                        if (!blackSent) { frames.write(black); frames.flush(); blackSent = true; }
+                        continue;
+                    }
+                    blackSent = false;
+                    frames.write(f);
+                    frames.flush();
+                }
+            } catch (Exception e) {
+                if (running) Log.w(TAG, "app frames: " + e);
+            }
+            if (running) main.post(this::stopAll); // AppServer died
+        }, "rear-app-frames").start();
+    }
+
+    private void appCommand(String c) {
+        OutputStream o = appCmd;
+        if (o == null) return;
+        try {
+            synchronized (this) {
+                o.write((c + "\n").getBytes());
+                o.flush();
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "app cmd: " + e);
+        }
+    }
+
     private void stopAll() {
         boolean was = running;
         running = false;
@@ -257,7 +326,17 @@ public class RearService extends Service {
         if (wl != null && wl.isHeld()) wl.release();
         Process p = proc;
         proc = null;
+        Process ap = appProc;
+        appProc = null;
         new Thread(() -> {
+            if (ap != null) {
+                try {
+                    appCmd.write("QUIT\n".getBytes());
+                    appCmd.flush();
+                } catch (Exception ignored) {}
+                try { Thread.sleep(300); } catch (InterruptedException ignored) {}
+                ap.destroy();
+            }
             try {
                 if (frames != null) frames.close(); // helper exits on EOF and releases the touch grab
             } catch (Exception ignored) {}
@@ -284,14 +363,21 @@ public class RearService extends Service {
                 new Intent(this, RearService.class).setAction(ACTION_STOP), PendingIntent.FLAG_IMMUTABLE);
         PendingIntent open = PendingIntent.getActivity(this, 0,
                 new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
-        return new Notification.Builder(this, "rear")
+        Notification.Builder b = new Notification.Builder(this, "rear")
                 .setSmallIcon(android.R.drawable.ic_menu_gallery)
                 .setContentTitle("Задний экран")
                 .setContentText("Показываю медиа")
                 .setContentIntent(open)
                 .setOngoing(true)
-                .addAction(new Notification.Action.Builder(null, "Стоп", stop).build())
-                .build();
+                .addAction(new Notification.Action.Builder(null, "Стоп", stop).build());
+        if (new Prefs(this).mode() == Prefs.MODE_APP) {
+            b.setContentText("Приложение: " + new Prefs(this).appLabel());
+            b.addAction(new Notification.Action.Builder(null, "Назад", PendingIntent.getService(this, 2,
+                    new Intent(this, RearService.class).setAction(ACTION_BACK), PendingIntent.FLAG_IMMUTABLE)).build());
+            b.addAction(new Notification.Action.Builder(null, "Домой", PendingIntent.getService(this, 3,
+                    new Intent(this, RearService.class).setAction(ACTION_HOME), PendingIntent.FLAG_IMMUTABLE)).build());
+        }
+        return b.build();
     }
 
     private void toast(String s) {

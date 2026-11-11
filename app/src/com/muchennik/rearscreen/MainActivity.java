@@ -24,7 +24,7 @@ public class MainActivity extends Activity {
     private static final int PICK = 1;
     private static final int[] TIMER_STEPS = {5, 10, 15, 30, 45, 60, 120, 180, 300, 600, 900, 1200, 1800, 2700, 3600};
     private Prefs prefs;
-    private TextView files, timerLabel, slideLabel, blLabel, status;
+    private TextView files, timerLabel, slideLabel, blLabel, status, appLabel, dpiLabel;
     private LinearLayout root;
 
     @Override protected void onCreate(Bundle b) {
@@ -44,7 +44,26 @@ public class MainActivity extends Activity {
         status = text("", 15, true);
         root.addView(status);
 
-        header("Медиа");
+        header("Что показывать сзади");
+        root.addView(radios(new String[] {"Медиа (фото, GIF, видео)", "Приложение (с тачем и клавиатурой)"},
+                prefs.mode(), i -> { prefs.put("mode", i); refresh(); }));
+
+        header("Приложение");
+        appLabel = text("", 14, false);
+        root.addView(appLabel);
+        root.addView(button("Выбрать приложение", v -> pickApp()));
+        android.widget.CheckBox ime = new android.widget.CheckBox(this);
+        ime.setText("Клавиатура на заднем экране (иначе — на основном)");
+        ime.setChecked(prefs.imeOnRear());
+        ime.setOnCheckedChangeListener((cb, on) -> prefs.put("ime_rear", on));
+        root.addView(ime);
+        dpiLabel = text("", 14, false);
+        root.addView(dpiLabel);
+        root.addView(seek(140, prefs.dpi() - 100, i -> { prefs.put("dpi", i + 100); refresh(); }));
+        root.addView(text("Меньше плотность — больше влезает (мельче). Применяется при следующем запуске. "
+                + "Управление: тап/свайп по заднему экрану; «Назад», «Домой», «Стоп» — в уведомлении.", 12, false));
+
+        header("Медиа (для режима «Медиа»)");
         files = text("", 14, false);
         root.addView(files);
         LinearLayout row = hrow();
@@ -103,7 +122,7 @@ public class MainActivity extends Activity {
         root.addView(ctl);
         root.addView(text("Двойной тап сзади: погасить (или выключить в режимах «по двойному тапу» и "
                 + "«никогда»). Плитка «Задний экран» в шторке включает и выключает показ.\n\n"
-                + "Режим «Приложение на заднем экране» (Chrome и т.п. с тачем и клавиатурой) — в следующей версии.",
+                + "Кнопка «Показать» запускает выбранный режим: медиа или приложение.",
                 12, false));
         refresh();
     }
@@ -116,6 +135,8 @@ public class MainActivity extends Activity {
     private void refresh() {
         if (status == null) return;
         status.setText(prefs.running() ? "● Показ идёт" : "○ Задний экран у Blackview");
+        appLabel.setText("Приложение: " + prefs.appLabel() + " (" + prefs.appPackage() + ")");
+        dpiLabel.setText("Плотность: " + prefs.dpi() + " dpi");
         List<String> m = prefs.media();
         StringBuilder sb = new StringBuilder(m.isEmpty() ? "Файлы не выбраны" : "Файлов: " + m.size());
         for (String u : m) sb.append("\n• ").append(name(Uri.parse(u)));
@@ -125,6 +146,22 @@ public class MainActivity extends Activity {
                 + (prefs.offMode() == Prefs.OFF_TIMER ? "" : " (только для режима «Через время»)"));
         slideLabel.setText("Смена файла каждые " + prefs.slideSec() + " с");
         blLabel.setText("Яркость: " + prefs.brightness() + " / 16");
+    }
+
+    private void pickApp() {
+        android.content.pm.PackageManager pm = getPackageManager();
+        Intent main = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER);
+        List<android.content.pm.ResolveInfo> apps = pm.queryIntentActivities(main, 0);
+        apps.sort((a, b) -> a.loadLabel(pm).toString().compareToIgnoreCase(b.loadLabel(pm).toString()));
+        String[] names = new String[apps.size()];
+        for (int k = 0; k < names.length; k++) names[k] = apps.get(k).loadLabel(pm).toString();
+        new android.app.AlertDialog.Builder(this)
+                .setTitle("Приложение для заднего экрана")
+                .setItems(names, (d, k) -> {
+                    prefs.putApp(apps.get(k).activityInfo.packageName, names[k]);
+                    refresh();
+                })
+                .show();
     }
 
     private void pick() {

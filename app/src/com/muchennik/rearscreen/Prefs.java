@@ -40,6 +40,15 @@ final class Prefs {
     boolean canWake() { return wakeMode() != WAKE_NONE; }
     boolean running() { return sp.getBoolean("running", false); }
 
+    /** what the rear screen shows */
+    static final int MODE_MEDIA = 0, MODE_APP = 1;
+    int mode() { return sp.getInt("mode", MODE_MEDIA); }
+    String appPackage() { return sp.getString("app_pkg", "com.android.chrome"); }
+    String appLabel() { return sp.getString("app_label", "Chrome"); }
+    boolean imeOnRear() { return sp.getBoolean("ime_rear", true); }
+    int dpi() { return sp.getInt("dpi", 140); }
+    void putApp(String pkg, String label) { sp.edit().putString("app_pkg", pkg).putString("app_label", label).apply(); }
+
     void put(String k, int v) { sp.edit().putInt(k, v).apply(); }
     void put(String k, boolean v) { sp.edit().putBoolean(k, v).apply(); }
 }
