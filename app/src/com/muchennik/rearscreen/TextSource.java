@@ -102,7 +102,8 @@ final class TextSource {
     }
 
     private static String esc(String s) {
-        return s.replace("\\", "\\\\").replace(";", "\;").replace(",", "\\,").replace(":", "\\:").replace("\"", "\\\"");
+        String bs = String.valueOf('\\');
+        return s.replace(bs, bs + bs).replace(";", bs + ";").replace(",", "\\,").replace(":", "\\:").replace("\"", "\\\"");
     }
 
     static String qrCaption(Prefs pr) {
