@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
             TEXT = 0xFFF1F2F5, SUB = 0xFF8A90A0, ACCENT = 0xFFFF7A3D, ACCENT_DIM = 0x33FF7A3D, OK = 0xFF4ADE80;
 
     private Prefs prefs;
-    private LinearLayout page, appsBox, appSec, visSec, mediaSec, filesBox;
+    private LinearLayout page, appsBox, appSec, visSec, mediaSec, filesBox, tickSec, qrSec, wifiBox, contactBox, textBox;
     private TextView statusText, statusDot, startBtn, previewGlyph;
     private final List<View> modeTiles = new ArrayList<>();
     private final List<Runnable> refreshers = new ArrayList<>();
@@ -77,7 +77,8 @@ public class MainActivity extends Activity {
         LinearLayout tiles = column();
         LinearLayout tileRow = null;
         String[][] modes = {{"▣", "Медиа", "фото · GIF · видео"}, {"⠿", "Приложения", "иконки сзади"},
-                {"▁▃▆", "Эквалайзер", "звук"}, {"◔", "Монитор", "ЦП · ОЗУ · батарея"}};
+                {"▁▃▆", "Эквалайзер", "звук"}, {"◔", "Монитор", "ЦП · ОЗУ · батарея"},
+                {"≋", "Строка", "бегущий текст"}, {"▦", "QR-код", "Wi-Fi · ссылка"}};
         for (int i = 0; i < modes.length; i++) {
             if (i % 2 == 0) {
                 tileRow = new LinearLayout(this);
@@ -101,11 +102,13 @@ public class MainActivity extends Activity {
         space(page, 22);
 
         // ---- per-mode sections
-        appSec = column(); visSec = column(); mediaSec = column();
-        page.addView(appSec); page.addView(visSec); page.addView(mediaSec);
+        appSec = column(); visSec = column(); mediaSec = column(); tickSec = column(); qrSec = column();
+        page.addView(appSec); page.addView(visSec); page.addView(mediaSec); page.addView(tickSec); page.addView(qrSec);
         buildApps();
         buildVis();
         buildMedia();
+        buildTicker();
+        buildQr();
 
         // ---- common
         page.addView(label("ЭКРАН"));
@@ -262,6 +265,82 @@ public class MainActivity extends Activity {
         space(mediaSec, 22);
     }
 
+    private void buildTicker() {
+        tickSec.addView(label("БЕГУЩАЯ СТРОКА"));
+        LinearLayout c = card();
+        c.addView(field("Текст", "tk_text", prefs.tickerText(), false, android.text.InputType.TYPE_CLASS_TEXT
+                | android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE | android.text.InputType.TYPE_TEXT_FLAG_CAP_SENTENCES));
+        divider(c);
+        c.addView(picker("Вид", TextSource.TICKER_STYLES, prefs::tickerStyle, i -> prefs.put("tk_style", i)));
+        divider(c);
+        c.addView(picker("Цвет", TextSource.COLORS, prefs::tickerColor, i -> prefs.put("tk_color", i)));
+        divider(c);
+        c.addView(picker("Размер", TextSource.SIZES, prefs::tickerSize, i -> prefs.put("tk_size", i)));
+        divider(c);
+        c.addView(slider("Скорость", 9, prefs::tickerSpeed, i -> prefs.put("tk_speed", i),
+                () -> String.valueOf(prefs.tickerSpeed() + 1)));
+        tickSec.addView(c);
+        space(tickSec, 8);
+        tickSec.addView(hint("Всё меняется на ходу, эмодзи тоже можно. «Статично» — текст по центру, "
+                + "переносится и сам уменьшается, чтобы влезть."));
+        space(tickSec, 22);
+    }
+
+    private void buildQr() {
+        qrSec.addView(label("QR-КОД"));
+        LinearLayout c = card();
+        c.addView(picker("Что в коде", TextSource.QR_TYPES, prefs::qrType, i -> prefs.put("qr_type", i)));
+        textBox = column();
+        divider(textBox);
+        textBox.addView(field("Текст или ссылка", "qr_text", prefs.qrText(), false,
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_URI));
+        divider(textBox);
+        textBox.addView(field("Подпись под кодом (необязательно)", "qr_caption", prefs.qrCaption(), false,
+                android.text.InputType.TYPE_CLASS_TEXT));
+        c.addView(textBox);
+        wifiBox = column();
+        divider(wifiBox);
+        wifiBox.addView(field("Имя сети (SSID)", "qr_ssid", prefs.qrWifiSsid(), false, android.text.InputType.TYPE_CLASS_TEXT));
+        divider(wifiBox);
+        wifiBox.addView(field("Пароль (пусто — открытая сеть)", "qr_pass", prefs.qrWifiPass(), true,
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD));
+        c.addView(wifiBox);
+        contactBox = column();
+        divider(contactBox);
+        contactBox.addView(field("Имя", "qr_name", prefs.qrName(), false,
+                android.text.InputType.TYPE_CLASS_TEXT | android.text.InputType.TYPE_TEXT_FLAG_CAP_WORDS));
+        divider(contactBox);
+        contactBox.addView(field("Телефон", "qr_phone", prefs.qrPhone(), false, android.text.InputType.TYPE_CLASS_PHONE));
+        c.addView(contactBox);
+        qrSec.addView(c);
+        space(qrSec, 8);
+        qrSec.addView(hint("Код обновляется сразу. Wi-Fi-код подключает к сети камерой — без ввода пароля. "
+                + "Если камера плохо ловит — прибавь яркость."));
+        space(qrSec, 22);
+    }
+
+    /** text input row, saved to prefs as you type */
+    private View field(String title, String key, String value, boolean secret, int inputType) {
+        LinearLayout c = column();
+        c.setPadding(dp(16), dp(12), dp(16), dp(12));
+        c.addView(text(title, 12, SUB, false));
+        android.widget.EditText e = new android.widget.EditText(this);
+        e.setText(value);
+        e.setTextColor(TEXT);
+        e.setHintTextColor(0xFF555A66);
+        e.setTextSize(16);
+        e.setInputType(inputType);
+        e.setBackground(null);
+        e.setPadding(0, dp(4), 0, 0);
+        e.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c2) {}
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c2) {}
+            @Override public void afterTextChanged(android.text.Editable s) { prefs.put(key, s.toString()); }
+        });
+        c.addView(e);
+        return c;
+    }
+
     // ===================================================================== state
 
     @Override protected void onResume() {
@@ -278,7 +357,7 @@ public class MainActivity extends Activity {
         startBtn.setText(on ? "Остановить" : "Запустить");
         startBtn.setTextColor(on ? TEXT : Color.WHITE);
         startBtn.setBackground(ripple(on ? round(CARD2, dp(24), LINE, dp(1)) : round(ACCENT, dp(24), 0, 0)));
-        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆", "◔"}[Math.min(3, mode)]);
+        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆", "◔", "≋", "▦"}[Math.min(5, mode)]);
         previewGlyph.setTextColor(on ? ACCENT : 0xFF3A3F4A);
         for (int i = 0; i < modeTiles.size(); i++) {
             boolean sel = i == mode;
@@ -287,6 +366,12 @@ public class MainActivity extends Activity {
         appSec.setVisibility(mode == Prefs.MODE_APP ? View.VISIBLE : View.GONE);
         visSec.setVisibility(mode == Prefs.MODE_VIS ? View.VISIBLE : View.GONE);
         mediaSec.setVisibility(mode == Prefs.MODE_MEDIA ? View.VISIBLE : View.GONE);
+        tickSec.setVisibility(mode == Prefs.MODE_TICKER ? View.VISIBLE : View.GONE);
+        qrSec.setVisibility(mode == Prefs.MODE_QR ? View.VISIBLE : View.GONE);
+        int qt = prefs.qrType();
+        textBox.setVisibility(qt == 0 ? View.VISIBLE : View.GONE);
+        wifiBox.setVisibility(qt == 1 ? View.VISIBLE : View.GONE);
+        contactBox.setVisibility(qt == 2 ? View.VISIBLE : View.GONE);
         for (Runnable r : refreshers) r.run();
         fillApps();
         fillFiles();

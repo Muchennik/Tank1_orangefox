@@ -191,7 +191,10 @@ public class RearService extends Service {
         modeShown = m;
         appMode = m == Prefs.MODE_APP;
         if (appMode) startApp();
-        else if (m == Prefs.MODE_STATS) {
+        else if (m == Prefs.MODE_TICKER || m == Prefs.MODE_QR) {
+            renderThread = new Thread(this::textLoop, "rear-text");
+            renderThread.start();
+        } else if (m == Prefs.MODE_STATS) {
             renderThread = new Thread(this::statsLoop, "rear-stats");
             renderThread.start();
         } else if (m == Prefs.MODE_VIS) {
@@ -286,6 +289,38 @@ public class RearService extends Service {
             if (running) Log.e(TAG, "vis loop", e);
         } finally {
             if (v != null) v.close();
+        }
+    }
+
+    /** Ticker / QR code. */
+    private void textLoop() {
+        byte[] frame = new byte[Frames.SIZE];
+        byte[] black = new byte[Frames.SIZE];
+        TextSource ts = new TextSource();
+        boolean blackSent = false;
+        final int g = gen;
+        boolean qr = prefs.mode() == Prefs.MODE_QR;
+        try {
+            while (running && g == gen) {
+                if (awake && prefs.offMode() == Prefs.OFF_TIMER
+                        && SystemClock.uptimeMillis() - awakeSince > prefs.timerSec() * 1000L) sleep();
+                if (!awake) {
+                    if (!blackSent) { writeFrame(black); blackSent = true; }
+                    Thread.sleep(150);
+                    continue;
+                }
+                blackSent = false;
+                if (qr) {
+                    ts.qr(prefs, frame);
+                    writeFrame(frame);
+                    Thread.sleep(300); // static picture; re-read settings a few times a second
+                } else {
+                    ts.ticker(prefs, frame);
+                    writeFrame(frame);  // paced by the panel (~18 fps)
+                }
+            }
+        } catch (Exception e) {
+            if (running) Log.e(TAG, "text", e);
         }
     }
 
@@ -622,6 +657,10 @@ public class RearService extends Service {
                     new Intent(this, RearService.class).setAction(ACTION_MENU), PendingIntent.FLAG_IMMUTABLE)).build());
         } else if (new Prefs(this).mode() == Prefs.MODE_VIS) {
             b.setContentText("Эквалайзер");
+        } else if (new Prefs(this).mode() == Prefs.MODE_TICKER) {
+            b.setContentText("Бегущая строка");
+        } else if (new Prefs(this).mode() == Prefs.MODE_QR) {
+            b.setContentText("QR-код");
         } else if (new Prefs(this).mode() == Prefs.MODE_STATS) {
             b.setContentText("Монитор системы");
         }

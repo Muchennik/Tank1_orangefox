@@ -41,7 +41,7 @@ final class Prefs {
     boolean running() { return sp.getBoolean("running", false); }
 
     /** what the rear screen shows */
-    static final int MODE_MEDIA = 0, MODE_APP = 1, MODE_VIS = 2, MODE_STATS = 3;
+    static final int MODE_MEDIA = 0, MODE_APP = 1, MODE_VIS = 2, MODE_STATS = 3, MODE_TICKER = 4, MODE_QR = 5;
     int mode() { return sp.getInt("mode", MODE_MEDIA); }
     String appPackage() { return sp.getString("app_pkg", "com.android.chrome"); }
     String appLabel() { return sp.getString("app_label", "Chrome"); }
@@ -64,6 +64,21 @@ final class Prefs {
     int visSource() { return sp.getInt("vis_src", VisSource.SRC_OUT); }
     int visStyle() { return sp.getInt("vis_style", VisSource.STYLE_BARS); }
     int visSensitivity() { return sp.getInt("vis_sens", 10); }
+
+    String str(String k) { return sp.getString(k, ""); }
+    void put(String k, String v) { sp.edit().putString(k, v).apply(); }
+    String tickerText() { return sp.getString("tk_text", "Привет 👋"); }
+    int tickerColor() { return sp.getInt("tk_color", 0); }
+    int tickerSize() { return sp.getInt("tk_size", 1); }
+    int tickerSpeed() { return sp.getInt("tk_speed", 4); }
+    int tickerStyle() { return sp.getInt("tk_style", 0); }
+    int qrType() { return sp.getInt("qr_type", 0); }
+    String qrText() { return str("qr_text"); }
+    String qrCaption() { return str("qr_caption"); }
+    String qrWifiSsid() { return str("qr_ssid"); }
+    String qrWifiPass() { return str("qr_pass"); }
+    String qrName() { return str("qr_name"); }
+    String qrPhone() { return str("qr_phone"); }
 
     void put(String k, int v) { sp.edit().putInt(k, v).apply(); }
     void put(String k, boolean v) { sp.edit().putBoolean(k, v).apply(); }
