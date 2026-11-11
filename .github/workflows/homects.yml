@@ -1,0 +1,39 @@
+name: Home to Circle to Search (Xposed module)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tools-homects]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: APK
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | grep -E "android-3[0-6]$" | sort -V | tail -1)
+          mkdir -p out/stubs out/classes out/dex
+          "$BT/aapt2" compile --dir res -o out/res.zip
+          "$BT/aapt2" link -o out/base.apk --manifest AndroidManifest.xml -I "$PLAT/android.jar" -A assets out/res.zip
+          javac --release 11 -Xlint:-options -cp "$PLAT/android.jar" -d out/stubs $(find stubs -name '*.java')
+          javac --release 11 -Xlint:-options -cp "$PLAT/android.jar:out/stubs" -d out/classes $(find src -name '*.java')
+          "$BT/d8" --release --min-api 30 --lib "$PLAT/android.jar" --classpath out/stubs --output out/dex $(find out/classes -name '*.class')
+          (cd out/dex && zip -q ../base.apk classes.dex)
+          "$BT/zipalign" -f -p 4 out/base.apk out/aligned.apk
+          keytool -genkeypair -keystore out/k.jks -storepass homects -keypass homects -alias k -keyalg RSA -keysize 2048 -validity 10000 -dname CN=HomeCTS >/dev/null 2>&1
+          "$BT/apksigner" sign --ks out/k.jks --ks-pass pass:homects --key-pass pass:homects --out HomeCTS.apk out/aligned.apk
+          "$BT/aapt2" dump badging HomeCTS.apk | head -2
+          unzip -l HomeCTS.apk
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "homects-${{ github.run_number }}" HomeCTS.apk --target "$GITHUB_SHA" \
+            --title "Home -> Circle to Search #${{ github.run_number }}" \
+            --notes "LSPosed module: long press Home opens Circle to Search instead of Gemini. Scope: System Framework."
