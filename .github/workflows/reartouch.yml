@@ -1,0 +1,35 @@
+name: Rear touch split (Magisk module)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [tools-reartouch]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          set -e
+          BT=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          PLAT=$(ls -d "$ANDROID_HOME"/platforms/android-* | grep -E "android-3[0-6]$" | sort -V | tail -1)
+          mkdir -p out/stubs out/classes out/dex
+          javac --release 11 -Xlint:-options -cp "$PLAT/android.jar" -d out/stubs $(find stubs -name '*.java')
+          javac --release 11 -Xlint:-options -cp "$PLAT/android.jar:out/stubs" -d out/classes $(find src -name '*.java')
+          "$BT/d8" --release --min-api 30 --lib "$PLAT/android.jar" --classpath out/stubs --output out/dex $(find out/classes -name '*.class')
+          cp out/dex/classes.dex module/reartouch.dex
+          chmod 755 module/service.sh module/META-INF/com/google/android/update-binary
+          (cd module && zip -qr ../RearTouchSplit.zip .)
+          unzip -l RearTouchSplit.zip
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "reartouch-${{ github.run_number }}" RearTouchSplit.zip --target "$GITHUB_SHA" \
+            --title "Rear touch split #${{ github.run_number }}" \
+            --notes "Magisk module for OSCAL TANK 1: rear screen touches no longer tap the main screen."

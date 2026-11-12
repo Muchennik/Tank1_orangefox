@@ -1,0 +1,6 @@
+id=rear_touch_split
+name=Rear touch split (Tank 1)
+version=3
+versionCode=3
+author=Muchen'nik
+description=Touching the rear screen no longer taps the main screen. Rear features keep their touch. Log: /data/local/tmp/reartouch.log
