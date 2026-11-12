@@ -12,7 +12,10 @@ loaded() { [ -d "/sys/module/$(echo "$1" | tr - _)" ]; }
 load_mod() {
     m=$1
     loaded "$m" && return 0
-    line=$(grep -m1 -E "(^|/)$m\.ko:" "$D/modules.dep")
+    pat=$(echo "$m" | sed 's/[-_]/[-_]/g')     # file may use - or _ (leds-x.ko vs leds_x)
+    line=$(grep -m1 -E "(^|/)$pat\.ko:" "$D/modules.dep")
+    [ -n "$line" ] || { echo "$m: not in modules.dep"; return 1; }
+    f=${line%%:*}; m=$(basename "$f" .ko)
     deps=${line#*:}
     rev=""
     for d in $deps; do rev="$d $rev"; done   # deepest dependency is listed last
@@ -23,19 +26,21 @@ load_mod() {
     insmod "$D/$m.ko" && echo "insmod $m ok" || { echo "insmod $m FAILED"; dmesg | grep -i "unknown symbol" | tail -5; }
 }
 
+# Drivers that live only in vendor_dlkm (not in the vendor_boot module list):
+#   rear display: helper -> gc9307 panel -> cst816t touch (touch is loaded so fox_rear can
+#     grab it away from the recovery UI)
+#   torches: leds-mt6360 (camera-block flash, mt6360_flash_ch1/2) is a panel dependency;
+#     leds-ocp81375 is the big front lamp (/sys/class/leds/infrared on this firmware)
+mkdir -p /tmp/vdlkm
+# recovery creates the by-name links for super partitions a few seconds after start
+i=0; while [ ! -e /dev/block/by-name/vendor_dlkm ] && [ $i -lt 15 ]; do sleep 1; i=$((i+1)); done
+for b in /dev/block/by-name/vendor_dlkm /dev/block/mapper/vendor_dlkm_b /dev/block/mapper/vendor_dlkm_a; do
+    [ -e "$b" ] && mount -o ro "$b" /tmp/vdlkm && { echo "mounted $b"; break; }
+done
+for m in chamsion_sublcmtp_helper gc9307nf_hsd_spi hynitron_cst816t leds-mt6360 leds-ocp81375; do load_mod $m; done
+umount /tmp/vdlkm 2>/dev/null
+ls /sys/class/leds
 wait_node 8
-if [ ! -e /dev/odm_sub_lcd ]; then
-    # rear LCD + touch drivers live in vendor_dlkm, not in the vendor_boot module list
-    echo "no /dev/odm_sub_lcd, loading rear display modules from vendor_dlkm"
-    mkdir -p /tmp/vdlkm
-    for b in /dev/block/by-name/vendor_dlkm /dev/block/mapper/vendor_dlkm_b /dev/block/mapper/vendor_dlkm_a; do
-        [ -e "$b" ] && mount -o ro "$b" /tmp/vdlkm && { echo "mounted $b"; break; }
-    done
-    # helper -> panel -> touch (touch is loaded so fox_rear can grab it away from the UI)
-    for m in chamsion_sublcmtp_helper gc9307nf_hsd_spi hynitron_cst816t; do load_mod $m; done
-    wait_node 5
-    umount /tmp/vdlkm 2>/dev/null
-fi
 ls -lZ /dev/odm_sub_lcd || exit 0
 chmod 0660 /dev/odm_sub_lcd
 exec /system/bin/fox_rear show /system/etc/fox_rear.rgb565 10
