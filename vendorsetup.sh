@@ -25,7 +25,9 @@ if [ "$1" = "$FDEVICE" -o "$FOX_BUILD_DEVICE" = "$FDEVICE" ]; then
 
     # Identity
     export FOX_VARIANT="A15"
-    export OF_MAINTAINER="Drag228228"
+    export OF_MAINTAINER="Muchen’nik"
+    export FOX_MAINTAINER_PATCH_VERSION="1"
+    export OF_MAINTAINER_AVATAR="$(pwd)/device/oscal/$FDEVICE/maintainer.png"
     export FOX_BUILD_TYPE="Unofficial"
 
     # Recovery lives in vendor_boot (header v4)
