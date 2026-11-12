@@ -7,7 +7,7 @@
  *   frame ioctl 0x40012200 with a 240x296 RGB565 big-endian buffer.
  * The node is opened / closed for every call (keeping it open hangs the SPI driver).
  *
- *   fox_rear show <frame.rgb565> [backlight]   power on, draw, redraw every 20 s (daemon)
+ *   fox_rear show <frame.rgb565> [backlight]   daemon: logo while the main screen is lit
  *   fox_rear off                               backlight 0 + power off
  */
 #include <dirent.h>
@@ -30,6 +30,7 @@
 #define IOC_OFF 0x2201u
 #define IOC_ON 0x2202u
 #define IOC_BL 0x40042206u
+#define MAIN_BL "/sys/class/leds/lcd-backlight/brightness"
 
 static volatile sig_atomic_t stop;
 
@@ -72,6 +73,16 @@ static int grab_touch(void) {
     return found;
 }
 
+/* main panel brightness, -1 if unknown (then the rear stays on) */
+static int main_brightness(void) {
+    FILE *f = fopen(MAIN_BL, "r");
+    if (!f) return -1;
+    int v = -1;
+    if (fscanf(f, "%d", &v) != 1) v = -1;
+    fclose(f);
+    return v;
+}
+
 static void on_term(int s) {
     (void)s;
     stop = 1;
@@ -101,19 +112,30 @@ int main(int argc, char **argv) {
     signal(SIGINT, on_term);
     int tfd = grab_touch();
     printf("rear touch: %s\n", tfd >= 0 ? "grabbed" : "not present");
-    int r = lcd_ioctl(IOC_ON, NULL);
-    printf("power on: %d\n", r);
-    backlight(bl);
-    for (int n = 0; !stop; n++) {
-        r = lcd_ioctl(IOC_FRAME, buf);
-        if (n < 2 || r < 0) {
-            printf("frame %d: %d %s\n", n, r, r < 0 ? strerror(-r) : "ok");
-            fflush(stdout);
+    /* the rear follows the main screen: dark when recovery blanks the main panel
+       (screen timeout / power key), back on with the logo when it lights up again */
+    int lit = 0, n = 0;
+    for (int sec = 0; !stop; sec++) {
+        int want = main_brightness() != 0;
+        if (want && !lit) {
+            int r = lcd_ioctl(IOC_ON, NULL);
+            backlight(bl);
+            r = lcd_ioctl(IOC_FRAME, buf);
+            if (n++ < 3 || r < 0) printf("rear on, frame: %d %s\n", r, r < 0 ? strerror(-r) : "ok");
+            lit = 1;
+            sec = 0;
+        } else if (!want && lit) {
+            backlight(0);
+            lcd_ioctl(IOC_OFF, NULL);
+            printf("rear off (main screen dark)\n");
+            lit = 0;
+        } else if (lit && sec % 20 == 19) {
+            int r = lcd_ioctl(IOC_FRAME, buf); /* refresh */
+            if (r < 0) printf("refresh: %d %s\n", r, strerror(-r));
         }
-        for (int i = 0; i < 20 && !stop; i++) {
-            sleep(1);
-            if (tfd < 0 && n == 0 && i % 5 == 4) tfd = grab_touch(); /* driver may load late */
-        }
+        if (tfd < 0 && sec < 30 && sec % 5 == 4) tfd = grab_touch(); /* driver may load late */
+        fflush(stdout);
+        sleep(1);
     }
     backlight(0);
     lcd_ioctl(IOC_OFF, NULL);
