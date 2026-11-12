@@ -103,6 +103,8 @@ jobs:
           while IFS= read -r m; do cp -v "$GITHUB_WORKSPACE/tree/maintainer.png" "$m"; found=1; done \
             < <(find "$FOX/bootable/recovery" "$FOX/vendor/recovery" -path "*About/maintainer.png" 2>/dev/null)
           [ $found = 1 ] || echo "::warning title=avatar::no About/maintainer.png in the OrangeFox source"
+          # second torch button (camera-block flash) next to the stock one (big lamp)
+          python3 "$GITHUB_WORKSPACE/tree/tools/fox_theme_patch.py" "$FOX/bootable/recovery/gui/theme/portrait_hdpi"
 
       - name: Build recovery
         run: |
@@ -146,6 +148,7 @@ jobs:
           for x in "$R"/vendor/etc/vintf/manifest/*.xml; do grep -q 'type="framework"' "$x" && { echo "BAD: $x"; bad=1; }; done
           ls "$R"/system/etc/vintf/manifest "$R"/vendor/etc/vintf/manifest
           [ $bad = 0 ]
+          echo "== camera flash button"; grep -c fox_camflash "$R"/twres/pages/advanced.xml || echo "::warning title=camflash::second torch button missing"
           echo "== avatar in image"; ls -l "$R"/twres/images/Default/About/maintainer.png
           cmp "$R"/twres/images/Default/About/maintainer.png tree/maintainer.png && echo "avatar OK" || echo "::warning title=avatar::image still has the stock maintainer.png"
           echo "== built image"; python3 tree/tools/vendor_boot_tool.py info "$OUT/vendor_boot.img"

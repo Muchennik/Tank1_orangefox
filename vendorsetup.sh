@@ -65,10 +65,10 @@ if [ "$1" = "$FDEVICE" -o "$FOX_BUILD_DEVICE" = "$FDEVICE" ]; then
     export FOX_ENABLE_APP_MANAGER=1
     export FOX_DELETE_AROMAFM=1
 
-    # Flashlight toggle: big front lamp (ocp81375, named "infrared" by this firmware) +
-    # camera-block flash (mt6360 ch1). Both drivers are loaded from vendor_dlkm by fox_rear.sh
+    # Stock flashlight button = big front lamp (ocp81375, named "infrared" by this firmware).
+    # The camera-block flash (mt6360) has its own button (tools/fox_theme_patch.py).
+    # Both drivers are loaded from vendor_dlkm by fox_rear.sh
     export OF_FL_PATH1="/sys/class/leds/infrared"
-    export OF_FL_PATH2="/sys/class/leds/mt6360_flash_ch1"
     export OF_FLASHLIGHT_ENABLE=1
 
     # Misc
