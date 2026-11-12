@@ -1,0 +1,4 @@
+<!-- Base framework manifest: without it libvintf ignores manifest/ fragments and servicemanager
+     refuses every AIDL service ("NULL VINTF MANIFEST") — boot HAL, keystore2. -->
+<manifest version="8.0" type="framework">
+</manifest>

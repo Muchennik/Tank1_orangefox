@@ -1,0 +1,4 @@
+<!-- Base device manifest: needed so the KeyMint / Gatekeeper / SharedSecret / SecureClock
+     fragments in manifest/ are read and those services may register. -->
+<manifest version="8.0" type="device">
+</manifest>

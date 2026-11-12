@@ -73,6 +73,9 @@ service teed /vendor/bin/teed \
     --prebuilt /vendor/app/t6/data \
     --logpath /tmp/tkcore.log \
     --proprefix vendor.trustkernel
+    # vendor blobs first: with the global /system/lib64-first path they picked OrangeFox's older
+    # libc++ and failed to link (__libcpp_verbose_abort)
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
     # root with full capabilities (as on BV7100): teed switches to system itself, and with
     # only SYS_RAWIO it died with "drop privs failed" (exit 249)
     user root
@@ -81,12 +84,18 @@ service teed /vendor/bin/teed \
     disabled
 
 service vendor.keymint-3-0-trustkernel /vendor/bin/hw/android.hardware.security.keymint@3.0-service.trustkernel
+    # vendor blobs first: with the global /system/lib64-first path they picked OrangeFox's older
+    # libc++ and failed to link (__libcpp_verbose_abort)
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
     user root
     group root system
     seclabel u:r:recovery:s0
     disabled
 
 service vendor.gatekeeper /vendor/bin/hw/android.hardware.gatekeeper-service.trustkernel
+    # vendor blobs first: with the global /system/lib64-first path they picked OrangeFox's older
+    # libc++ and failed to link (__libcpp_verbose_abort)
+    setenv LD_LIBRARY_PATH /vendor/lib64:/vendor/lib64/hw:/system/lib64
     user root
     group root system
     seclabel u:r:recovery:s0
