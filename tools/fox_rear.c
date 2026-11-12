@@ -10,7 +10,9 @@
  *   fox_rear show <frame.rgb565> [backlight]   power on, draw, redraw every 20 s (daemon)
  *   fox_rear off                               backlight 0 + power off
  */
+#include <dirent.h>
 #include <errno.h>
+#include <linux/input.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -49,6 +51,27 @@ static void backlight(int v) {
     }
 }
 
+/* grab the rear touch (if its driver is loaded) so nothing else gets its events */
+static int grab_touch(void) {
+    DIR *d = opendir("/dev/input");
+    if (!d) return -1;
+    struct dirent *e;
+    int found = -1;
+    while ((e = readdir(d))) {
+        if (strncmp(e->d_name, "event", 5)) continue;
+        char p[64], name[128] = {0};
+        snprintf(p, sizeof p, "/dev/input/%s", e->d_name);
+        int fd = open(p, O_RDONLY | O_CLOEXEC);
+        if (fd < 0) continue;
+        if (ioctl(fd, EVIOCGNAME(sizeof name - 1), name) >= 0 && strstr(name, "cst0xx")) {
+            if (ioctl(fd, EVIOCGRAB, 1) == 0) { found = fd; break; }
+        }
+        close(fd);
+    }
+    closedir(d);
+    return found;
+}
+
 static void on_term(int s) {
     (void)s;
     stop = 1;
@@ -76,6 +99,8 @@ int main(int argc, char **argv) {
 
     signal(SIGTERM, on_term);
     signal(SIGINT, on_term);
+    int tfd = grab_touch();
+    printf("rear touch: %s\n", tfd >= 0 ? "grabbed" : "not present");
     int r = lcd_ioctl(IOC_ON, NULL);
     printf("power on: %d\n", r);
     backlight(bl);
@@ -85,7 +110,10 @@ int main(int argc, char **argv) {
             printf("frame %d: %d %s\n", n, r, r < 0 ? strerror(-r) : "ok");
             fflush(stdout);
         }
-        for (int i = 0; i < 20 && !stop; i++) sleep(1);
+        for (int i = 0; i < 20 && !stop; i++) {
+            sleep(1);
+            if (tfd < 0 && n == 0 && i % 5 == 4) tfd = grab_touch(); /* driver may load late */
+        }
     }
     backlight(0);
     lcd_ioctl(IOC_OFF, NULL);
