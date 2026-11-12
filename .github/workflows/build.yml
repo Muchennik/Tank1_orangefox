@@ -125,6 +125,12 @@ jobs:
           for b in "$R"/vendor/bin/teed "$R"/vendor/bin/hw/*; do
             python3 tree/tools/symcheck.py "$R" /vendor/lib64:/vendor/lib64/hw:/system/lib64 "$b" || true
           done
+          echo "== VINTF check (a device fragment under /system breaks the whole framework manifest)"
+          bad=0
+          for x in "$R"/system/etc/vintf/manifest/*.xml; do grep -q 'type="device"' "$x" && { echo "BAD: $x"; bad=1; }; done
+          for x in "$R"/vendor/etc/vintf/manifest/*.xml; do grep -q 'type="framework"' "$x" && { echo "BAD: $x"; bad=1; }; done
+          ls "$R"/system/etc/vintf/manifest "$R"/vendor/etc/vintf/manifest
+          [ $bad = 0 ]
           echo "== built image"; python3 tree/tools/vendor_boot_tool.py info "$OUT/vendor_boot.img"
           mkdir -p release
           NAME="OrangeFox-${{ inputs.fox_branch }}-TANK_1-vendor_boot-$(date +%Y%m%d)-${{ github.run_number }}.img"
