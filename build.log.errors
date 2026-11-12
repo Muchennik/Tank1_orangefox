@@ -1,0 +1,208 @@
+7:19:14:42 If you run into segfaults or other errors, try reducing your
+1067:[ 89% 1039/1162] compile /mnt/fox/out/host/linux-x86/bin/go/golang-protobuf-internal-errors/pkg/google.golang.org/protobuf/internal/errors.a
+1139:[ 95% 1111/1162] compile /mnt/fox/out/host/linux-x86/bin/go/soong-java-config-error_prone/pkg/android/soong/java/config/error_prone.a
+1192:/mnt/fox/out/build-twrp_TANK_1-cleanspec.ninja is missing, regenerating...
+1193:/mnt/fox/out/build-twrp_TANK_1.ninja is missing, regenerating...
+1265:/mnt/fox/out/build-twrp_TANK_1-package.ninja is missing, regenerating...
+1294:[  4% 1245/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp [linux_glibc] (priority: 66)
+1378:[  4% 1329/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 58)
+1509:[  4% 1460/31091] //external/rust/crates/thiserror-impl:libthiserror_impl rustc src/lib.rs [linux_glibc] (priority: 57)
+1511:[  4% 1462/31091] //external/rust/crates/thiserror:libthiserror rustc src/lib.rs [linux_glibc] (priority: 56)
+1531:[  4% 1482/31091] //external/protobuf:libprotoc clang++ src/google/protobuf/util/internal/error_listener.cc [linux_glibc] (priority: 53)
+1681:[  5% 1632/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 51)
+1690:[  5% 1641/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 51)
+1720:[  5% 1671/31091] //external/rust/crates/thiserror:libthiserror rustc src/lib.rs (priority: 50)
+1755:[  5% 1706/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp [linux_glibc] (priority: 49)
+1762:[  5% 1713/31091] //system/libbase:libbase clang++ errors_unix.cpp [linux_glibc] (priority: 49)
+2039:[  6% 1990/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp [arm] (priority: 48)
+2687:[  8% 2638/31091] //system/core/libutils/binder:libutils_binder clang++ Errors.cpp (priority: 46)
+2769:[  8% 2720/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 43)
+2778:[  8% 2729/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 43)
+2862:[  9% 2813/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 42)
+2922:[  9% 2873/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp [arm] (priority: 41)
+2930:[  9% 2881/31091] //system/libbase:libbase clang++ errors_unix.cpp [arm] (priority: 41)
+3008:[  9% 2959/31091] //external/rust/crates/thiserror:libthiserror rustc src/lib.rs [arm] (priority: 40)
+3557:[ 11% 3500/31091] //system/core/libutils/binder:libutils_binder clang++ Errors.cpp [arm] (priority: 36)
+3576:[ 11% 3519/31091] AIDL ndk hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/3/android/hardware/security/keymint/ErrorCode.aidl (priority: 35)
+3610:[ 11% 3553/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 35)
+3621:[ 11% 3564/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 35)
+3674:[ 11% 3617/31091] //hardware/interfaces/security/keymint/aidl:android.hardware.security.keymint-V3-ndk clang++ android/hardware/security/keymint/ErrorCode.cpp (priority: 33)
+3705:[ 11% 3647/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 36)
+3821:[ 12% 3763/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp [arm] (priority: 33)
+3831:[ 12% 3773/31091] //system/libbase:libbase clang++ errors_unix.cpp [arm] (priority: 33)
+3874:[ 12% 3816/31091] //bionic/libc:libc_bionic clang++ bionic/error.cpp (priority: 33)
+4006:[ 12% 3948/31091] //bionic/libc:libc_bionic clang++ bionic/strerror.cpp (priority: 33)
+4076:[ 12% 4018/31091] //bionic/libc:libc_dns clang dns/resolv/herror.c (priority: 33)
+4155:[ 13% 4097/31091] //bionic/libc:libc_netbsd clang upstream-netbsd/lib/libc/regex/regerror.c (priority: 33)
+4367:[ 13% 4309/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 32)
+4375:[ 13% 4317/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 32)
+4655:[ 14% 4597/31091] //system/core/libutils/binder:libutils_binder clang++ Errors.cpp (priority: 30)
+4708:WARNING: frameworks/base/keystore/aaid/aidl/android/security/keystore/IKeyAttestationApplicationIdProvider.aidl:23.14-58: The constant 'ERROR_GET_ATTESTATION_APPLICATION_ID_FAILED' has a redundant substring 'ATTESTATION' being defined in 'IKeyAttestationApplicationIdProvider' [-Wredundant-name]
+4709:WARNING: frameworks/base/keystore/aaid/aidl/android/security/keystore/IKeyAttestationApplicationIdProvider.aidl:23.14-58: The constant 'ERROR_GET_ATTESTATION_APPLICATION_ID_FAILED' has a redundant substring 'APPLICATION' being defined in 'IKeyAttestationApplicationIdProvider' [-Wredundant-name]
+4710:WARNING: frameworks/base/keystore/aaid/aidl/android/security/keystore/IKeyAttestationApplicationIdProvider.aidl:23.14-58: The constant 'ERROR_GET_ATTESTATION_APPLICATION_ID_FAILED' has a redundant substring 'ID' being defined in 'IKeyAttestationApplicationIdProvider' [-Wredundant-name]
+4836:[ 15% 4775/31091] //bionic/libc:libc_bionic clang++ bionic/error.cpp (priority: 29)
+4965:[ 15% 4904/31091] //bionic/libc:libc_bionic clang++ bionic/strerror.cpp (priority: 29)
+5039:[ 16% 4978/31091] //bionic/libc:libc_dns clang dns/resolv/herror.c (priority: 29)
+5117:[ 16% 5056/31091] //bionic/libc:libc_netbsd clang upstream-netbsd/lib/libc/regex/regerror.c (priority: 29)
+5630:[ 17% 5569/31091] //bionic/libc:libc_bionic clang++ bionic/error.cpp [arm] (priority: 28)
+5761:[ 18% 5700/31091] //bionic/libc:libc_bionic clang++ bionic/strerror.cpp [arm] (priority: 28)
+5874:[ 18% 5813/31091] //bionic/libc:libc_dns clang dns/resolv/herror.c [arm] (priority: 28)
+5963:[ 18% 5902/31091] //bionic/libc:libc_netbsd clang upstream-netbsd/lib/libc/regex/regerror.c [arm] (priority: 28)
+6319:[ 20% 6258/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 27)
+6390:[ 20% 6329/31091] //system/core/libutils/binder:libutils_binder clang++ Errors.cpp (priority: 27)
+6578:[ 20% 6517/31091] //bionic/libc:libc_bionic clang++ bionic/error.cpp (priority: 26)
+6709:[ 21% 6648/31091] //bionic/libc:libc_bionic clang++ bionic/strerror.cpp (priority: 26)
+6779:[ 21% 6718/31091] //bionic/libc:libc_dns clang dns/resolv/herror.c (priority: 26)
+6858:[ 21% 6797/31091] //bionic/libc:libc_netbsd clang upstream-netbsd/lib/libc/regex/regerror.c (priority: 26)
+6997:[ 22% 6936/31091] //external/e2fsprogs/lib/et:libext2_com_err clang error_message.c (priority: 26)
+7002:[ 22% 6941/31091] //external/e2fsprogs/lib/et:libext2_com_err clang error_message.c (priority: 26)
+7827:[ 24% 7758/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 24)
+7838:[ 24% 7769/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 24)
+8075:[ 25% 7987/31091] //external/pcre:libpcre2 clang src/pcre2_error.c (priority: 24)
+8149:[ 25% 8061/31091] //hardware/interfaces/security/keymint/aidl:android.hardware.security.keymint-V3-ndk clang++ android/hardware/security/keymint/ErrorCode.cpp [arm] (priority: 23)
+8619:[ 27% 8531/31091] //external/protobuf:libprotobuf-cpp-full clang++ src/google/protobuf/util/internal/error_listener.cc [linux_glibc] (priority: 23)
+9081:[ 28% 8993/31091] AIDL Rust hardware/interfaces/security/keymint/aidl/aidl_api/android.hardware.security.keymint/3/android/hardware/security/keymint/ErrorCode.aidl (priority: 21)
+9212:[ 29% 9124/31091] //external/pcre:libpcre2 clang src/pcre2_error.c [arm] (priority: 21)
+9240:[ 29% 9152/31091] //external/pcre:libpcre2 clang src/pcre2_error.c (priority: 21)
+9474:WARNING: frameworks/base/core/java/android/security/rkp/IGetKeyCallback.aidl:28.9-19: The enumerator 'ERROR_UNKNOWN' has a redundant substring 'ERROR' being defined in 'ErrorCode' [-Wredundant-name]
+9475:WARNING: frameworks/base/core/java/android/security/rkp/IGetKeyCallback.aidl:28.9-19: The enumerator 'ERROR_REQUIRES_SECURITY_PATCH' has a redundant substring 'ERROR' being defined in 'ErrorCode' [-Wredundant-name]
+9476:WARNING: frameworks/base/core/java/android/security/rkp/IGetKeyCallback.aidl:28.9-19: The enumerator 'ERROR_PENDING_INTERNET_CONNECTIVITY' has a redundant substring 'ERROR' being defined in 'ErrorCode' [-Wredundant-name]
+9477:WARNING: frameworks/base/core/java/android/security/rkp/IGetKeyCallback.aidl:28.9-19: The enumerator 'ERROR_PERMANENT' has a redundant substring 'ERROR' being defined in 'ErrorCode' [-Wredundant-name]
+9504:WARNING: system/gsid/aidl/android/gsi/IImageService.aidl:33.14-26: The constant 'IMAGE_ERROR' has a redundant substring 'IMAGE' being defined in 'IImageService' [-Wredundant-name]
+9522:[ 30% 9415/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 20)
+9529:[ 30% 9422/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 20)
+9583:[ 30% 9476/31091] //external/e2fsprogs/lib/et:libext2_com_err clang error_message.c [arm] (priority: 20)
+9896:[ 31% 9777/31091] HIDL inheritance hierarchy: android.hardware.automotive.can@1.0::ICanErrorListener => '/mnt/fox/out/soong/.intermediates/hardware/interfaces/automotive/can/1.0/android.hardware.automotive.can@1.0-inheritance-hierarchy/gen/ICanErrorListener_inheritance_hierarchy.json' (priority: 19)
+10657:[ 33% 10536/31091] //external/icu/icu4c/source/common:libicuuc clang++ errorcode.cpp (priority: 19)
+10863:[ 34% 10739/31091] //external/libpng:libpng clang pngerror.c (priority: 19)
+11393:[ 36% 11249/31091] AIDL Rust system/security/keystore2/aidl/android/security/metrics/RkpError.aidl (priority: 18)
+11394:WARNING: system/security/keystore2/aidl/android/security/metrics/RkpError.aidl:24.5-14: The enumerator 'RKP_ERROR_UNSPECIFIED' has a redundant substring 'RKP' being defined in 'RkpError' [-Wredundant-name]
+11395:WARNING: system/security/keystore2/aidl/android/security/metrics/RkpError.aidl:24.5-14: The enumerator 'RKP_ERROR_UNSPECIFIED' has a redundant substring 'ERROR' being defined in 'RkpError' [-Wredundant-name]
+11396:[ 36% 11250/31091] AIDL Rust system/security/keystore2/aidl/android/security/metrics/RkpErrorStats.aidl (priority: 18)
+11397:WARNING: system/security/keystore2/aidl/android/security/metrics/RkpErrorStats.aidl:27.13-22: The enum field 'rkpError' has no explicit value. [-Wenum-explicit-default]
+11398:WARNING: system/security/keystore2/aidl/android/security/metrics/RkpErrorStats.aidl:28.18-33: The enum field 'security_level' has no explicit value. [-Wenum-explicit-default]
+11471:[ 36% 11310/31091] //system/libbase:libbase header-abi-dumper posix_strerror_r.cpp (priority: 18)
+11479:[ 36% 11318/31091] //system/libbase:libbase header-abi-dumper errors_unix.cpp (priority: 18)
+11518:[ 36% 11357/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp [arm] (priority: 18)
+11712:[ 37% 11551/31091] //external/pcre:libpcre2 clang src/pcre2_error.c [linux_glibc] (priority: 18)
+12119:[ 38% 11958/31091] //system/libbase:libbase header-abi-dumper posix_strerror_r.cpp [arm] (priority: 17)
+12126:[ 38% 11965/31091] //system/libbase:libbase header-abi-dumper errors_unix.cpp [arm] (priority: 17)
+12169:[ 38% 12008/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 17)
+12299:[ 39% 12138/31091] //external/libchrome:libchrome clang++ base/posix/safe_strerror.cc (priority: 17)
+12486:[ 39% 12325/31091] //external/e2fsprogs/lib/et:libext2_com_err clang error_message.c (priority: 17)
+12789:[ 40% 12628/31091] //external/libpng:libpng clang pngerror.c [arm] (priority: 17)
+12873:[ 40% 12712/31091] //external/protobuf:libprotobuf-cpp-full clang++ src/google/protobuf/util/internal/error_listener.cc (priority: 17)
+13387:[ 42% 13223/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 16)
+13394:[ 42% 13230/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 16)
+13947:[ 44% 13783/31091] //system/core/libutils/binder:libutils_binder header-abi-dumper Errors.cpp (priority: 16)
+13958:[ 44% 13794/31091] //system/libziparchive:libziparchive clang++ zip_error.cpp (priority: 16)
+13964:[ 44% 13800/31091] //system/libziparchive:libziparchive clang++ zip_error.cpp (priority: 16)
+13967:[ 44% 13803/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 16)
+14312:[ 45% 14136/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 15)
+14341:[ 45% 14165/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp [apex31] (priority: 15)
+14496:[ 46% 14320/31091] //external/libchrome:libchrome clang++ base/posix/safe_strerror.cc [arm] (priority: 15)
+15196:[ 48% 14951/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 15)
+15236:[ 48% 14991/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 15)
+15273:[ 48% 15028/31091] //external/zstd:libzstd clang lib/common/error_private.c [arm] (priority: 15)
+15719:[ 49% 15449/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp [arm] (priority: 14)
+15727:[ 49% 15457/31091] //system/libbase:libbase clang++ errors_unix.cpp [arm] (priority: 14)
+15980:[ 50% 15710/31091] //external/icu/icu4c/source/common:libicuuc clang++ errorcode.cpp [linux_glibc] (priority: 14)
+16224:[ 51% 15954/31091] //external/magisk-prebuilt/utils:libmagiskutils clang++ missing.cpp (priority: 14)
+16233:[ 51% 15963/31091] //external/magisk-prebuilt/utils:libmagiskutils clang++ missing.cpp (priority: 14)
+16334:[ 51% 16064/31091] //external/libncurses:libncurses clang ncurses/tinfo/comp_error.c (priority: 14)
+16639:[ 52% 16364/31091] //system/libziparchive:libziparchive clang++ zip_error.cpp [arm] (priority: 14)
+17486:[ 55% 17122/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 13)
+18012:[ 56% 17617/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 12)
+18020:[ 56% 17625/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 12)
+18031:[ 56% 17636/31091] //external/libbrillo:libbrillo clang++ brillo/errors/error.cc (priority: 12)
+18110:[ 56% 17639/31091] //external/libbrillo:libbrillo clang++ brillo/errors/error_codes.cc (priority: 12)
+18134:[ 56% 17663/31091] //external/libbrillo:libbrillo-stream clang++ brillo/streams/stream_errors.cc (priority: 12)
+18216:[ 57% 17745/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 12)
+18287:[ 57% 17816/31091] //bionic/libc:libc_bionic clang++ bionic/error.cpp (priority: 12)
+18420:[ 57% 17949/31091] //bionic/libc:libc_bionic clang++ bionic/strerror.cpp (priority: 12)
+18488:[ 57% 18017/31091] //bionic/libc:libc_dns clang dns/resolv/herror.c (priority: 12)
+18569:[ 58% 18098/31091] //bionic/libc:libc_netbsd clang upstream-netbsd/lib/libc/regex/regerror.c (priority: 12)
+18819:[ 59% 18348/31091] //external/libchrome:libchrome clang++ base/posix/safe_strerror.cc (priority: 12)
+20434:[ 64% 19959/31091] //system/update_engine:libpayload_consumer clang++ common/error_code_utils.cc (priority: 12)
+20513:[ 64% 20009/31091] //external/pcre:libpcre2 clang src/pcre2_error.c (priority: 12)
+20936:[ 65% 20427/31091] //system/libziparchive:libziparchive clang++ zip_error.cpp (priority: 12)
+20940:[ 65% 20431/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 12)
+20979:[ 65% 20470/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 12)
+22172:  274 |     x = _("Unknown error");
+22268:  337 |                   if (any_failed = sh_chkwrite (any_failed))
+22271:  337 |                   if (any_failed = sh_chkwrite (any_failed))
+22275:  337 |                   if (any_failed = sh_chkwrite (any_failed))
+22279:  364 |   for (i = any_failed = 0; var = variable_list[i]; i++)
+22282:  364 |   for (i = any_failed = 0; var = variable_list[i]; i++)
+22286:  364 |   for (i = any_failed = 0; var = variable_list[i]; i++)
+22290:  367 |       if (any_failed = sh_chkwrite (any_failed))
+22293:  367 |       if (any_failed = sh_chkwrite (any_failed))
+22297:  367 |       if (any_failed = sh_chkwrite (any_failed))
+22301:  388 |   for (i = any_failed = 0; var = variable_list[i]; i++)
+22304:  388 |   for (i = any_failed = 0; var = variable_list[i]; i++)
+22308:  388 |   for (i = any_failed = 0; var = variable_list[i]; i++)
+22312:  391 |       if (any_failed = sh_chkwrite (any_failed))
+22315:  391 |       if (any_failed = sh_chkwrite (any_failed))
+22319:  391 |       if (any_failed = sh_chkwrite (any_failed))
+22376:  102 |       sh_nojobs (_("cannot suspend"));
+22570:external/bash/lib/readline/bind.c:903:46: warning: 'open' has superfluous mode bits; missing O_CREAT or O_TMPFILE? [-Wuser-defined-warnings]
+22669:external/bash/lib/readline/histfile.c:289:54: warning: 'open' has superfluous mode bits; missing O_CREAT or O_TMPFILE? [-Wuser-defined-warnings]
+22680:external/bash/lib/readline/histfile.c:532:60: warning: 'open' has superfluous mode bits; missing O_CREAT or O_TMPFILE? [-Wuser-defined-warnings]
+22969:[ 69% 21487/31091] //external/bash:bash clang lib/sh/strerror.c (priority: 11)
+23093:[ 69% 21530/31091] //external/bash:bash clang error.c (priority: 11)
+23094:external/bash/error.c:487:10: warning: returning 'const char *' from a function with result type 'char *' discards qualifiers [-Wincompatible-pointer-types-discards-qualifiers]
+23095:  487 |   return (_(cmd_error_table[code]));
+23341:external/bash/redir.c:531:48: warning: 'open' has superfluous mode bits; missing O_CREAT or O_TMPFILE? [-Wuser-defined-warnings]
+23457:  147 |   test_syntax_error (_("argument expected"), (char *)NULL);
+23466:  156 |   test_syntax_error (_("%s: integer expression expected"), pch);
+23475:  265 |         test_syntax_error (_("`)' expected"), (char *)NULL);
+23484:  267 |         test_syntax_error (_("`)' expected, found %s"), argv[pos]);
+23493:  466 |       test_syntax_error (_("%s: binary operator expected"), w);
+23502:  756 |         test_syntax_error (_("%s: unary operator expected"), argv[pos]);
+23511:  759 |     test_syntax_error (_("%s: unary operator expected"), argv[pos]);
+23520:  799 |     test_syntax_error (_("%s: binary operator expected"), argv[pos+1]);
+23529:  881 |         test_syntax_error (_("missing `]'"), (char *)NULL);
+23538:  899 |         test_syntax_error (_("syntax error: `%s' unexpected"), argv[pos]);
+23547:  901 |         test_syntax_error (_("too many arguments"), (char *)NULL);
+23684: 2826 |       report_syntax_error (_("maximum here-document count exceeded"));
+23693:  200 | static void report_syntax_error PARAMS((char *));
+23696: 4699 |       if (etext = error_token_from_token (cond_token))
+23699: 4699 |       if (etext = error_token_from_token (cond_token))
+23703: 4699 |       if (etext = error_token_from_token (cond_token))
+23707: 4781 |           if (etext = error_token_from_token (cond_token))
+23710: 4781 |           if (etext = error_token_from_token (cond_token))
+23714: 4781 |           if (etext = error_token_from_token (cond_token))
+23718: 4813 |           if (etext = error_token_from_token (tok))
+23721: 4813 |           if (etext = error_token_from_token (tok))
+23725: 4813 |           if (etext = error_token_from_token (tok))
+23729: 4863 |           if (etext = error_token_from_token (tok))
+23732: 4863 |           if (etext = error_token_from_token (tok))
+23736: 4863 |           if (etext = error_token_from_token (tok))
+23740: 4889 |           if (etext = error_token_from_token (tok))
+23743: 4889 |           if (etext = error_token_from_token (tok))
+23747: 4889 |           if (etext = error_token_from_token (tok))
+23751: 4907 |       else if (etext = error_token_from_token (tok))
+23754: 4907 |       else if (etext = error_token_from_token (tok))
+23758: 4907 |       else if (etext = error_token_from_token (tok))
+23795: 6365 |       msg = EOF_Reached ? _("syntax error: unexpected end of file") : _("syntax error");
+24236:[ 70% 21830/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp [apex31] (priority: 11)
+24243:[ 70% 21837/31091] //system/libbase:libbase clang++ errors_unix.cpp [apex31] (priority: 11)
+24255:[ 70% 21849/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp (priority: 11)
+24262:[ 70% 21856/31091] //system/libbase:libbase clang++ errors_unix.cpp (priority: 11)
+24338:[ 70% 21894/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp (priority: 11)
+24368:[ 70% 21924/31091] //external/libcxx:libc++_static clang++ src/system_error.cpp [linux_glibc x86] (priority: 11)
+24954:[ 72% 22489/31091] //external/libncurses:libncurses clang ncurses/tinfo/comp_error.c [arm] (priority: 11)
+25040:[ 72% 22575/31091] //external/libnl:libnl clang lib/error.c (priority: 11)
+25077:[ 72% 22612/31091] //external/libnl:libnl clang lib/error.c [arm] (priority: 11)
+25349:[ 73% 22858/31091] //external/libxml2:libxml2 clang error.c (priority: 11)
+25387:[ 73% 22896/31091] //external/libxml2:libxml2 clang error.c [arm] (priority: 11)
+25449:[ 73% 22958/31091] //system/libziparchive:libziparchive clang++ zip_error.cpp (priority: 11)
+25455:[ 73% 22964/31091] //external/zstd:libzstd clang lib/common/error_private.c (priority: 11)
+25660:system/update_engine/aosp/sideload_main.cc:91:30: warning: format specifies type 'int' but the argument has type 'ErrorCode' [-Wformat]
+25661:   90 |           base::StringPrintf("ui_print Error applying update: %d (%s)",
+25663:   91 |                              error_code,
+31214:[ 92% 28712/31091] //system/libbase:libbase clang++ posix_strerror_r.cpp [linux_glibc x86] (priority: 9)
+31221:[ 92% 28719/31091] //system/libbase:libbase clang++ errors_unix.cpp [linux_glibc x86] (priority: 9)
+32198:[ 95% 29696/31091] //external/zstd:libzstd clang lib/common/error_private.c [apex31] (priority: 9)
+32239:[ 95% 29737/31091] //external/zstd:libzstd clang lib/common/error_private.c [linux_glibc] (priority: 9)
+33309:cp: bad '/mnt/fox/out/target/product/TANK_1/system/etc/nano': No such file or directory

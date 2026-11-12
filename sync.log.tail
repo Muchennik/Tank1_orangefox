@@ -1,0 +1,54 @@
+./orangefox_sync.sh, v20261107
+**************
+*** Syncing will take a *VERY* long time
+**************
+-- Starting the script ...
+-- The new build system will be located in "/mnt/fox"
+-- Initialising the twrp-14 minimal manifest repo ...
+
+repo has been initialized in /mnt/fox
+-- Done.
+-- Syncing the twrp-14 minimal manifest repo ...
+Finalizing sync state...
+repo sync has finished successfully.
+-- Done.
+-- Patching the twrp-14 minimal manifest for building OrangeFox for native android-14 devices ...
+patching file core/Makefile
+patching file core/config.mk
+patching file make/envsetup.sh
+-- The twrp-14 minimal manifest has been patched successfully
+-- Patching the twrp-14 .repo/manifests for building OrangeFox for native android-14 devices ...
+patching file remove-minimal.xml
+-- The twrp-14 .repo/manifests has been patched successfully
+Finalizing sync state...
+repo sync has finished successfully.
+-- Patching the twrp-14 system/ for building OrangeFox for native android-14 devices ...
+patching file core/fs_mgr/liblp/builder.cpp
+patching file core/fs_mgr/liblp/builder_test.cpp
+patching file core/fs_mgr/liblp/include/liblp/builder.h
+patching file update_engine/aosp/dynamic_partition_control_android.cc
+patching file vold/Android.bp
+patching file vold/Decrypt.cpp
+patching file vold/KeystoreInfo.cpp
+patching file vold/Weaver1.cpp
+patching file vold/Weaver1.h
+-- The twrp-14 system/ has been patched successfully
+-- Patching the twrp-14 vendor/twrp ...
+patching file build/soong/Android.bp
+patching file config/BoardConfigSoong.mk
+-- The twrp-14 vendor/twrp has been patched successfully
+-- Cloning se_omapi ...
+Cloning into 'external/se_omapi'...
+-- se_omapi has been cloned successfully
+-- Moving the TWRP recovery sources to /tmp
+-- Pulling the OrangeFox recovery sources ...
+Cloning into 'recovery'...
+-- The OrangeFox sources have been cloned successfully
+-- Cleaning up the TWRP recovery sources from /tmp
+-- Preparing for cloning the OrangeFox vendor tree ...
+-- Pulling the OrangeFox vendor tree ...
+Cloning into 'recovery'...
+-- The OrangeFox vendor tree has been cloned successfully
+-- Stop time =Thu Nov 12 19:14:06 UTC 2026
+-- Start time=Thu Nov 12 18:57:38 UTC 2026
+-- Now, clone your device trees to the correct locations!
