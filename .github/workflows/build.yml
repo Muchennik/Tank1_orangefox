@@ -96,6 +96,13 @@ jobs:
           mkdir -p "$FOX/device/oscal"
           rsync -a --exclude .git --exclude .github --exclude stock "$GITHUB_WORKSPACE/tree/" "$FOX/device/oscal/$DEVICE/"
           ls -la "$FOX/device/oscal/$DEVICE"
+          # maintainer avatar: OF_MAINTAINER_AVATAR alone did not reach the image (#21 had the stock
+          # About/maintainer.png), so also replace the theme file in the OrangeFox source
+          grep -rn "MAINTAINER_AVATAR" "$FOX/vendor/recovery" 2>/dev/null | head -5 || true
+          found=0
+          while IFS= read -r m; do cp -v "$GITHUB_WORKSPACE/tree/maintainer.png" "$m"; found=1; done \
+            < <(find "$FOX/bootable/recovery" "$FOX/vendor/recovery" -path "*About/maintainer.png" 2>/dev/null)
+          [ $found = 1 ] || echo "::warning title=avatar::no About/maintainer.png in the OrangeFox source"
 
       - name: Build recovery
         run: |
@@ -139,6 +146,8 @@ jobs:
           for x in "$R"/vendor/etc/vintf/manifest/*.xml; do grep -q 'type="framework"' "$x" && { echo "BAD: $x"; bad=1; }; done
           ls "$R"/system/etc/vintf/manifest "$R"/vendor/etc/vintf/manifest
           [ $bad = 0 ]
+          echo "== avatar in image"; ls -l "$R"/twres/images/Default/About/maintainer.png
+          cmp "$R"/twres/images/Default/About/maintainer.png tree/maintainer.png && echo "avatar OK" || echo "::warning title=avatar::image still has the stock maintainer.png"
           echo "== built image"; python3 tree/tools/vendor_boot_tool.py info "$OUT/vendor_boot.img"
           mkdir -p release
           NAME="OrangeFox-${{ inputs.fox_branch }}-TANK_1-vendor_boot-$(date +%Y%m%d)-${{ github.run_number }}.img"
