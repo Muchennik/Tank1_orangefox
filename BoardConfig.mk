@@ -156,8 +156,9 @@ TW_DEFAULT_BRIGHTNESS := 1200
 TW_CUSTOM_BATTERY_PATH := "/sys/class/power_supply/battery"
 # read capacity/status straight from sysfs (works even if the health HAL is not up)
 TW_USE_LEGACY_BATTERY_SERVICES := true
-# rear display touch (cst0xx) must never act as taps on the main UI; cst0xx first: "\x0ac" would be read as one hex escape
-TW_INPUT_BLACKLIST := "cst0xx_input\x0ahbtp_vm"
+# rear display touch (cst0xx) must never act as taps on the main UI. One name only: a "\x0a"
+# list breaks the soong variables JSON (#24). hbtp_vm (old value) is a Qualcomm device, not on MTK.
+TW_INPUT_BLACKLIST := "cst0xx_input"
 TW_USE_TOOLBOX := true
 TW_INCLUDE_RESETPROP := true
 TW_INCLUDE_LIBRESETPROP := true
