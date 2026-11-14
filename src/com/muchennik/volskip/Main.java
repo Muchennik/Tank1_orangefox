@@ -39,6 +39,8 @@ public class Main implements IXposedHookLoadPackage {
     private static int downKey = 0;
     private static boolean fired;
     private static Runnable pending;
+    private static int volAtDown = -1;
+    private static long lastLog;
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
@@ -68,19 +70,25 @@ public class Main implements IXposedHookLoadPackage {
                     if (!init(param.thisObject)) return;
                     boolean interactive = (((Integer) param.args[1]) & FLAG_INTERACTIVE) != 0;
                     int action = ev.getAction();
+                    XposedBridge.log(TAG + "key " + code + " act=" + action + " rep=" + ev.getRepeatCount()
+                            + " dev=" + ev.getDeviceId() + " flags=0x" + Integer.toHexString((Integer) param.args[1])
+                            + " down=" + downKey);
 
                     if (action == KeyEvent.ACTION_DOWN) {
-                        if (ev.getRepeatCount() > 0 && downKey == code) { param.setResult(0); return; }
+                        // repeats and the same key reported by a second input device while held
+                        if (downKey == code) { param.setResult(0); return; }
                         AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
                         if (interactive || am == null || !am.isMusicActive()) { downKey = 0; return; }
                         downKey = code;
                         fired = false;
+                        volAtDown = am.getStreamVolume(AudioManager.STREAM_MUSIC);
                         wl.acquire(3000);
                         final int k = code;
                         pending = new Runnable() {
                             @Override public void run() {
                                 if (downKey != k) return;
                                 fired = true;
+                                restoreVolume();
                                 media(k == KeyEvent.KEYCODE_VOLUME_UP
                                         ? KeyEvent.KEYCODE_MEDIA_NEXT : KeyEvent.KEYCODE_MEDIA_PREVIOUS);
                             }
@@ -88,6 +96,7 @@ public class Main implements IXposedHookLoadPackage {
                         handler.postDelayed(pending, LONG_PRESS_MS);
                         param.setResult(0);
                     } else if (action == KeyEvent.ACTION_UP && downKey == code) {
+                        if (fired) restoreVolume();
                         handler.removeCallbacks(pending);
                         downKey = 0;
                         if (!fired) {
@@ -121,6 +130,21 @@ public class Main implements IXposedHookLoadPackage {
             XposedBridge.log(TAG + "init: " + t);
             ctx = null;
             return false;
+        }
+    }
+
+    /** whoever else nudged the music volume while the key was held: put it back */
+    private static void restoreVolume() {
+        try {
+            if (volAtDown < 0) return;
+            AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
+            int now = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+            if (now != volAtDown) {
+                am.setStreamVolume(AudioManager.STREAM_MUSIC, volAtDown, 0);
+                XposedBridge.log(TAG + "volume restored " + now + " -> " + volAtDown);
+            }
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "restore: " + t);
         }
     }
 
