@@ -1,0 +1,65 @@
+name: MediaPad X2 kernel (charging fix)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [x2-kernel]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Kernel source (ProjectHiSi hi3635 @ e2f8545e = the ROM's running kernel)
+        run: |
+          set -e
+          git init -q k && cd k
+          git remote add origin https://github.com/ProjectHiSi/android_kernel_huawei_hi3635
+          git fetch -q --depth 1 origin e2f8545e4745457ea0a709f9b7d43ebd2e288537
+          git checkout -q FETCH_HEAD
+          git log -1 --format='%h %ad %s'
+
+      - name: Toolchain
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq bc bison flex libssl-dev python2 >/dev/null || true
+          git clone -q --depth 1 -b android-9.0.0_r1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 tc
+          tc/bin/aarch64-linux-android-gcc --version | head -1
+
+      - name: Configure + patch
+        run: |
+          set -e
+          cd k
+          python3 ../patches/fix_get_ibus.py drivers/huawei_platform/power/charger/huawei_charger.c
+          cp ../x2_running.config .config
+          export ARCH=arm64 CROSS_COMPILE=$GITHUB_WORKSPACE/tc/bin/aarch64-linux-android-
+          make olddefconfig >/dev/null
+          grep -E "GRACE_SELECT|BQ2429X" .config
+
+      - name: Build
+        run: |
+          set -e
+          cd k
+          export ARCH=arm64 CROSS_COMPILE=$GITHUB_WORKSPACE/tc/bin/aarch64-linux-android-
+          make -j$(nproc) HOSTCFLAGS="-fcommon -w" KCFLAGS="-w" Image 2>&1 | tee ../build.log | grep -E "error|Error" | head -50 || true
+          ls -l arch/arm64/boot/Image
+          strings arch/arm64/boot/Image | grep -m1 "Linux version"
+
+      - name: Upload log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp k/arch/arm64/boot/Image x2_Image
+          sha256sum x2_Image | tee x2_Image.sha256
+          gh release create "x2-kernel-${{ github.run_number }}" x2_Image x2_Image.sha256 --target "$GITHUB_SHA" \
+            --title "MediaPad X2 kernel #${{ github.run_number }}" --notes "e2f8545e + bq2429x get_ibus NULL guard (wall charger crash fix)"
