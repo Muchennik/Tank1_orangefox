@@ -48,8 +48,8 @@ jobs:
           make -j$(nproc) HOSTCFLAGS="-fcommon -w" KCFLAGS="-w" Image > ../build.log 2>&1
           rc=$?
           set -e
-          grep -n -E "error:|Error [0-9]|No rule|not found|command not found" ../build.log | head -40 || true
-          tail -40 ../build.log
+          grep -n -B12 -E "\] Error [0-9]" ../build.log | grep -v -E "^[0-9]+-  (CC|AS|LD|AR)  " | head -80 || true
+          tail -15 ../build.log
           [ $rc = 0 ]
           ls -l arch/arm64/boot/Image
           strings arch/arm64/boot/Image | grep -m1 "Linux version"
