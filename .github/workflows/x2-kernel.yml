@@ -41,10 +41,13 @@ jobs:
           set -e
           cd k
           python3 ../patches/fix_get_ibus.py drivers/huawei_platform/power/charger/huawei_charger.c
-          cp ../x2_running.config .config
+          # Huawei's kbuild strips "$(KBUILD_SRC)/" from $^ when linking composite objects: with an
+          # in-tree build KBUILD_SRC is empty, every "/" is removed and ld gets "no input files".
+          # Build out of tree (O=) like Huawei does.
+          mkdir -p ../out && cp ../x2_running.config ../out/.config
           export ARCH=arm64 CROSS_COMPILE=$GITHUB_WORKSPACE/tc/bin/aarch64-linux-android-
-          $GITHUB_WORKSPACE/make-4.2.1/make olddefconfig >/dev/null
-          grep -E "GRACE_SELECT|BQ2429X" .config
+          $GITHUB_WORKSPACE/make-4.2.1/make O=../out olddefconfig >/dev/null
+          grep -E "GRACE_SELECT|BQ2429X" ../out/.config
 
       - name: Build
         run: |
@@ -52,14 +55,14 @@ jobs:
           cd k
           export ARCH=arm64 CROSS_COMPILE=$GITHUB_WORKSPACE/tc/bin/aarch64-linux-android-
           set +e
-          $GITHUB_WORKSPACE/make-4.2.1/make -j$(nproc) HOSTCFLAGS="-fcommon -w" KCFLAGS="-w" Image > ../build.log 2>&1
+          $GITHUB_WORKSPACE/make-4.2.1/make O=../out -j$(nproc) HOSTCFLAGS="-fcommon -w" KCFLAGS="-w" Image > ../build.log 2>&1
           rc=$?
           set -e
           grep -n -B12 -E "\] Error [0-9]" ../build.log | grep -v -E "^[0-9]+-  (CC|AS|LD|AR)  " | head -80 || true
           tail -15 ../build.log
           [ $rc = 0 ]
-          ls -l arch/arm64/boot/Image
-          strings arch/arm64/boot/Image | grep -m1 "Linux version"
+          ls -l ../out/arch/arm64/boot/Image
+          strings ../out/arch/arm64/boot/Image | grep -m1 "Linux version"
 
       - name: Upload log on failure
         if: failure()
@@ -72,7 +75,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          cp k/arch/arm64/boot/Image x2_Image
+          cp out/arch/arm64/boot/Image x2_Image
           sha256sum x2_Image | tee x2_Image.sha256
           gh release create "x2-kernel-${{ github.run_number }}" x2_Image x2_Image.sha256 --target "$GITHUB_SHA" \
             --title "MediaPad X2 kernel #${{ github.run_number }}" --notes "e2f8545e + bq2429x get_ibus NULL guard (wall charger crash fix)"
