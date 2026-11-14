@@ -41,6 +41,12 @@ public class Main implements IXposedHookLoadPackage {
     private static Runnable pending;
     private static int volAtDown = -1;
     private static volatile boolean loggedCaller;
+    // keep blocking stray adjusts a bit after release: the vendor path can still deliver
+    // its own "key up" step after we've let go
+    private static final long GRACE_MS = 450;
+    private static volatile long blockUntil;
+    private static volatile boolean selfAdjust;
+    private static volatile int pressGen;
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
@@ -82,6 +88,7 @@ public class Main implements IXposedHookLoadPackage {
                         downKey = code;
                         fired = false;
                         loggedCaller = false;
+                        pressGen++;
                         volAtDown = am.getStreamVolume(AudioManager.STREAM_MUSIC);
                         wl.acquire(3000);
                         final int k = code;
@@ -97,14 +104,28 @@ public class Main implements IXposedHookLoadPackage {
                         handler.postDelayed(pending, LONG_PRESS_MS);
                         param.setResult(0);
                     } else if (action == KeyEvent.ACTION_UP && downKey == code) {
-                        if (fired) restoreVolume();
                         handler.removeCallbacks(pending);
+                        blockUntil = android.os.SystemClock.uptimeMillis() + GRACE_MS;
                         downKey = 0;
-                        if (!fired) {
+                        if (fired) {
+                            restoreVolume();
+                            // safety net: anything that slipped through right around release
+                            final int gen = pressGen;
+                            handler.postDelayed(new Runnable() {
+                                @Override public void run() {
+                                    if (gen == pressGen && downKey == 0) restoreVolume();
+                                }
+                            }, GRACE_MS + 50);
+                        } else {
                             AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
-                            if (am != null) am.adjustSuggestedStreamVolume(
-                                    code == KeyEvent.KEYCODE_VOLUME_UP ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER,
-                                    AudioManager.STREAM_MUSIC, 0);
+                            if (am != null) {
+                                selfAdjust = true;
+                                try {
+                                    am.adjustSuggestedStreamVolume(
+                                        code == KeyEvent.KEYCODE_VOLUME_UP ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER,
+                                        AudioManager.STREAM_MUSIC, 0);
+                                } finally { selfAdjust = false; }
+                            }
                         }
                         if (wl.isHeld()) wl.release();
                         param.setResult(0);
@@ -124,7 +145,8 @@ public class Main implements IXposedHookLoadPackage {
             XC_MethodHook block = new XC_MethodHook() {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) {
-                    if (downKey == 0) return;
+                    if (selfAdjust) return;
+                    if (downKey == 0 && android.os.SystemClock.uptimeMillis() > blockUntil) return;
                     param.setResult(null);
                     if (!loggedCaller) {
                         loggedCaller = true;
