@@ -19,19 +19,19 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 
 /**
  * Screen off + music playing:
- *   hold Volume Up   (>= 450 ms) -> next track
- *   hold Volume Down (>= 450 ms) -> previous track (players restart the current track
+ *   hold Volume Up   (>= 300 ms) -> next track
+ *   hold Volume Down (>= 300 ms) -> previous track (players restart the current track
  *                                   if it has been playing for more than a few seconds)
  *   short press                  -> volume step, as usual.
  *
- * Hooks PhoneWindowManager.interceptKeyBeforeQueueing in system_server (scope: "android").
+ * Hooks InputManagerService.interceptKeyBeforeQueueing in system_server (scope: "android").
  * While the screen is off and music is active the volume key is consumed; on release a short
  * press is turned back into a normal volume step, a long press has already skipped the track.
  */
 public class Main implements IXposedHookLoadPackage {
     private static final String TAG = "VolSkip: ";
     private static final int FLAG_INTERACTIVE = 0x20000000;
-    private static final long LONG_PRESS_MS = 450;
+    private static final long LONG_PRESS_MS = 300;
 
     private static Context ctx;
     private static Handler handler;
@@ -43,8 +43,20 @@ public class Main implements IXposedHookLoadPackage {
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
         if (!"android".equals(lp.packageName)) return;
-        Class<?> pwm = lp.classLoader.loadClass("com.android.server.policy.PhoneWindowManager");
-        XposedBridge.hookAllMethods(pwm, "interceptKeyBeforeQueueing", new XC_MethodHook() {
+        // Hook the very first Java entry point of key events (called from native InputDispatcher),
+        // before WindowManager and any vendor PhoneWindowManager subclass: Blackview's policy
+        // changed the volume before our PhoneWindowManager hook ran (volume + skip together).
+        Class<?> target;
+        String where;
+        try {
+            target = lp.classLoader.loadClass("com.android.server.input.InputManagerService");
+            where = "InputManagerService";
+        } catch (Throwable t) {
+            target = lp.classLoader.loadClass("com.android.server.policy.PhoneWindowManager");
+            where = "PhoneWindowManager";
+        }
+        final String hookedIn = where;
+        XposedBridge.hookAllMethods(target, "interceptKeyBeforeQueueing", new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
                 try {
@@ -92,7 +104,7 @@ public class Main implements IXposedHookLoadPackage {
                 }
             }
         });
-        XposedBridge.log(TAG + "hooked PhoneWindowManager.interceptKeyBeforeQueueing");
+        XposedBridge.log(TAG + "hooked " + hookedIn + ".interceptKeyBeforeQueueing");
     }
 
     private static boolean init(Object pwm) {
