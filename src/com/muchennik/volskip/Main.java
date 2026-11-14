@@ -36,11 +36,11 @@ public class Main implements IXposedHookLoadPackage {
     private static Context ctx;
     private static Handler handler;
     private static PowerManager.WakeLock wl;
-    private static int downKey = 0;
+    private static volatile int downKey = 0;
     private static boolean fired;
     private static Runnable pending;
     private static int volAtDown = -1;
-    private static long lastLog;
+    private static volatile boolean loggedCaller;
 
     @Override
     public void handleLoadPackage(XC_LoadPackage.LoadPackageParam lp) throws Throwable {
@@ -81,6 +81,7 @@ public class Main implements IXposedHookLoadPackage {
                         if (interactive || am == null || !am.isMusicActive()) { downKey = 0; return; }
                         downKey = code;
                         fired = false;
+                        loggedCaller = false;
                         volAtDown = am.getStreamVolume(AudioManager.STREAM_MUSIC);
                         wl.acquire(3000);
                         final int k = code;
@@ -114,6 +115,37 @@ public class Main implements IXposedHookLoadPackage {
             }
         });
         XposedBridge.log(TAG + "hooked " + hookedIn + ".interceptKeyBeforeQueueing");
+
+        // Something else inside system_server (not the normal key path, which we consume) keeps
+        // stepping the volume while the key is held. Block every volume *adjust* request that
+        // arrives while our screen-off press is in progress; our own step happens after release.
+        try {
+            Class<?> as = lp.classLoader.loadClass("com.android.server.audio.AudioService");
+            XC_MethodHook block = new XC_MethodHook() {
+                @Override
+                protected void beforeHookedMethod(MethodHookParam param) {
+                    if (downKey == 0) return;
+                    param.setResult(null);
+                    if (!loggedCaller) {
+                        loggedCaller = true;
+                        StringBuilder sb = new StringBuilder(TAG + "blocked " + param.method.getName() + " from:");
+                        StackTraceElement[] st = new Throwable().getStackTrace();
+                        for (int i = 0; i < st.length && i < 18; i++) sb.append("\n    ").append(st[i]);
+                        XposedBridge.log(sb.toString());
+                    }
+                }
+            };
+            String[] names = {"adjustSuggestedStreamVolume", "adjustSuggestedStreamVolumeForUid", "adjustStreamVolume",
+                    "adjustStreamVolumeWithAttribution", "adjustStreamVolumeForUid", "adjustVolume"};
+            int n = 0;
+            for (String m : names) {
+                java.util.Set<?> u = XposedBridge.hookAllMethods(as, m, block);
+                if (u != null) n += u.size();
+            }
+            XposedBridge.log(TAG + "AudioService adjust hooks: " + n);
+        } catch (Throwable t) {
+            XposedBridge.log(TAG + "AudioService: " + t);
+        }
     }
 
     private static boolean init(Object pwm) {
