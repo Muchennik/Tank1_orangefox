@@ -45,7 +45,6 @@ public class Main implements IXposedHookLoadPackage {
     // its own "key up" step after we've let go
     private static final long GRACE_MS = 450;
     private static volatile long blockUntil;
-    private static volatile boolean selfAdjust;
     private static volatile int pressGen;
 
     @Override
@@ -76,9 +75,6 @@ public class Main implements IXposedHookLoadPackage {
                     if (!init(param.thisObject)) return;
                     boolean interactive = (((Integer) param.args[1]) & FLAG_INTERACTIVE) != 0;
                     int action = ev.getAction();
-                    XposedBridge.log(TAG + "key " + code + " act=" + action + " rep=" + ev.getRepeatCount()
-                            + " dev=" + ev.getDeviceId() + " flags=0x" + Integer.toHexString((Integer) param.args[1])
-                            + " down=" + downKey);
 
                     if (action == KeyEvent.ACTION_DOWN) {
                         // repeats and the same key reported by a second input device while held
@@ -117,14 +113,14 @@ public class Main implements IXposedHookLoadPackage {
                                 }
                             }, GRACE_MS + 50);
                         } else {
+                            // set the volume directly: AudioManager.adjust* goes through MediaSessionService
+                            // asynchronously and would land inside our own post-release block window
                             AudioManager am = (AudioManager) ctx.getSystemService(Context.AUDIO_SERVICE);
                             if (am != null) {
-                                selfAdjust = true;
-                                try {
-                                    am.adjustSuggestedStreamVolume(
-                                        code == KeyEvent.KEYCODE_VOLUME_UP ? AudioManager.ADJUST_RAISE : AudioManager.ADJUST_LOWER,
-                                        AudioManager.STREAM_MUSIC, 0);
-                                } finally { selfAdjust = false; }
+                                int cur = am.getStreamVolume(AudioManager.STREAM_MUSIC);
+                                int max = am.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+                                int nv = code == KeyEvent.KEYCODE_VOLUME_UP ? Math.min(max, cur + 1) : Math.max(0, cur - 1);
+                                if (nv != cur) am.setStreamVolume(AudioManager.STREAM_MUSIC, nv, 0);
                             }
                         }
                         if (wl.isHeld()) wl.release();
@@ -145,16 +141,8 @@ public class Main implements IXposedHookLoadPackage {
             XC_MethodHook block = new XC_MethodHook() {
                 @Override
                 protected void beforeHookedMethod(MethodHookParam param) {
-                    if (selfAdjust) return;
                     if (downKey == 0 && android.os.SystemClock.uptimeMillis() > blockUntil) return;
                     param.setResult(null);
-                    if (!loggedCaller) {
-                        loggedCaller = true;
-                        StringBuilder sb = new StringBuilder(TAG + "blocked " + param.method.getName() + " from:");
-                        StackTraceElement[] st = new Throwable().getStackTrace();
-                        for (int i = 0; i < st.length && i < 18; i++) sb.append("\n    ").append(st[i]);
-                        XposedBridge.log(sb.toString());
-                    }
                 }
             };
             String[] names = {"adjustSuggestedStreamVolume", "adjustSuggestedStreamVolumeForUid", "adjustStreamVolume",
@@ -195,7 +183,6 @@ public class Main implements IXposedHookLoadPackage {
             int now = am.getStreamVolume(AudioManager.STREAM_MUSIC);
             if (now != volAtDown) {
                 am.setStreamVolume(AudioManager.STREAM_MUSIC, volAtDown, 0);
-                XposedBridge.log(TAG + "volume restored " + now + " -> " + volAtDown);
             }
         } catch (Throwable t) {
             XposedBridge.log(TAG + "restore: " + t);
@@ -218,7 +205,6 @@ public class Main implements IXposedHookLoadPackage {
             am.dispatchMediaKeyEvent(new KeyEvent(t, t, KeyEvent.ACTION_UP, code, 0));
             Vibrator v = (Vibrator) ctx.getSystemService(Context.VIBRATOR_SERVICE);
             if (v != null) v.vibrate(VibrationEffect.createOneShot(30, VibrationEffect.DEFAULT_AMPLITUDE));
-            XposedBridge.log(TAG + (code == KeyEvent.KEYCODE_MEDIA_NEXT ? "next" : "previous"));
         } catch (Throwable t) {
             XposedBridge.log(TAG + "media: " + t);
         }
