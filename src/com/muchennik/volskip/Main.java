@@ -31,7 +31,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 public class Main implements IXposedHookLoadPackage {
     private static final String TAG = "VolSkip: ";
     private static final int FLAG_INTERACTIVE = 0x20000000;
-    private static final long LONG_PRESS_MS = 300;
+    private static final long LONG_PRESS_MS = 550;
 
     private static Context ctx;
     private static Handler handler;
