@@ -154,7 +154,7 @@ static int ui_create(void) {
     ioctl(ui_fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT); /* touchscreen, not a touchpad */
     abs_setup(ABS_X, W - 1);
     abs_setup(ABS_Y, H - 1);
-    abs_setup(ABS_MT_SLOT, 0);
+    abs_setup(ABS_MT_SLOT, 9); /* min == max makes Android treat the axis as missing (protocol A) */
     abs_setup(ABS_MT_TRACKING_ID, 65535);
     abs_setup(ABS_MT_POSITION_X, W - 1);
     abs_setup(ABS_MT_POSITION_Y, H - 1);
