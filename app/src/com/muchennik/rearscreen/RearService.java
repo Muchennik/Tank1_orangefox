@@ -57,6 +57,8 @@ public class RearService extends Service {
     private final byte[] lastAppFrame = new byte[Frames.SIZE];
     private volatile boolean haveAppFrame;
     private final Object frameLock = new Object();
+    private Process padProc;          // PadServer: rear touch -> main screen
+    private volatile OutputStream padCmd;
 
     private final BroadcastReceiver screen = new BroadcastReceiver() {
         @Override public void onReceive(Context c, Intent i) {
@@ -77,6 +79,7 @@ public class RearService extends Service {
             appCommand("KEY " + (ACTION_BACK.equals(a) ? 4 : 3));
         } else if (ACTION_SWITCH.equals(a)) {
             if (running) switchMode();
+            if (running) updatePad();
             if (running && appMode) launcher = new Launcher(this, prefs.apps()); // app list edited: new grid
         } else if (ACTION_MENU.equals(a)) {
             if (running && appMode) {
@@ -114,6 +117,7 @@ public class RearService extends Service {
                 index = 0;
                 wake();
                 startMode();
+                updatePad();
                 TileService.requestListeningState(this,
                         new android.content.ComponentName(this, RearTile.class));
             } catch (Exception e) {
@@ -136,6 +140,17 @@ public class RearService extends Service {
             try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                 String l;
                 while ((l = r.readLine()) != null) {
+                    OutputStream pc = padCmd;
+                    if (pc != null && !appMode && (l.startsWith("D ") || l.startsWith("M ") || l.startsWith("U "))) {
+                        try {
+                            pc.write((l + "\n").getBytes());
+                            pc.flush();
+                        } catch (Exception e) {
+                            Log.w(TAG, "pad: " + e);
+                            padCmd = null;
+                        }
+                        continue;
+                    }
                     if (appMode && (l.startsWith("D ") || l.startsWith("M ") || l.startsWith("U "))) {
                         if (awake && inLauncher) {
                             awakeSince = SystemClock.uptimeMillis(); // touching keeps it on
@@ -596,6 +611,45 @@ public class RearService extends Service {
         }
     }
 
+    /** Rear touch drives the main screen (setting "Касания сзади"); not in app mode. */
+    private synchronized void updatePad() {
+        boolean want = running && prefs.padMode() == Prefs.PAD_MAIN && prefs.mode() != Prefs.MODE_APP;
+        if (want == (padProc != null)) return;
+        if (!want) { stopPad(); return; }
+        try {
+            String cmd = "CLASSPATH=" + getApplicationInfo().sourceDir + " app_process /system/bin "
+                    + PadServer.class.getName();
+            Process p = Runtime.getRuntime().exec(new String[] {"su", "2000", "-c", cmd});
+            padProc = p;
+            padCmd = p.getOutputStream();
+            new Thread(() -> {
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+                    String l;
+                    while ((l = r.readLine()) != null) {
+                        Log.i(TAG, "pad: " + l);
+                        if (l.startsWith("E ") || l.contains("Exception")) toast("Тачпад: " + l);
+                    }
+                } catch (Exception ignored) {}
+            }, "rear-pad-log").start();
+        } catch (Exception e) {
+            Log.e(TAG, "pad", e);
+            toast("Тачпад: " + e.getMessage());
+        }
+    }
+
+    private synchronized void stopPad() {
+        Process p = padProc;
+        OutputStream c = padCmd;
+        padProc = null;
+        padCmd = null;
+        if (p == null) return;
+        new Thread(() -> {
+            try { c.write("QUIT\n".getBytes()); c.flush(); c.close(); } catch (Exception ignored) {}
+            try { Thread.sleep(300); } catch (InterruptedException ignored) {}
+            p.destroy();
+        }, "rear-pad-stop").start();
+    }
+
     private void stopAll() {
         boolean was = running;
         running = false;
@@ -606,6 +660,7 @@ public class RearService extends Service {
         proc = null;
         Process ap = appProc;
         appProc = null;
+        stopPad();
         new Thread(() -> {
             if (ap != null) {
                 try {

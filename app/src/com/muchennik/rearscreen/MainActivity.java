@@ -125,6 +125,12 @@ public class MainActivity extends Activity {
         common.addView(picker("Как включать снова", new String[] {"Никак (экран отдаётся Blackview)",
                 "Одиночный тап сзади", "Двойной тап сзади"}, prefs::wakeMode, i -> prefs.put("wake", i)));
         divider(common);
+        common.addView(picker("Касания сзади", new String[] {"Только для заднего экрана",
+                "Управляют основным (зеркально)"}, prefs::padMode, i -> {
+            prefs.put("pad", i);
+            live();
+        }));
+        divider(common);
         common.addView(slider("Яркость", 15, () -> prefs.brightness() - 1, i -> {
             prefs.put("bl", i + 1);
             if (prefs.running()) startService(new Intent(this, RearService.class).setAction(RearService.ACTION_BRIGHTNESS));

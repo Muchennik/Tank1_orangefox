@@ -58,6 +58,9 @@ final class Prefs {
         return l;
     }
     void setApps(List<String> l) { sp.edit().putString("apps", String.join("\n", l)).apply(); }
+    /** what rear touches do outside app mode */
+    static final int PAD_OFF = 0, PAD_MAIN = 1;
+    int padMode() { return sp.getInt("pad", PAD_OFF); }
     /** own keyboard on the rear screen (else the normal one opens on the main screen) */
     boolean rearKeyboard() { return sp.getBoolean("kbd_rear", true); }
 
