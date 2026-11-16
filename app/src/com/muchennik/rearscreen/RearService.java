@@ -633,13 +633,13 @@ public class RearService extends Service {
         if (want == (padProc != null)) return;
         if (!want) { stopPad(); return; }
         try {
-            String cmd = "CLASSPATH=" + getApplicationInfo().sourceDir + " app_process /system/bin "
-                    + PadServer.class.getName();
-            Process p = Runtime.getRuntime().exec(new String[] {"su", "2000", "-c", cmd});
+            // native virtual touchscreen: Android maps it to the main screen itself (rotation,
+            // "show taps" dot), unlike injected events
+            Process p = Runtime.getRuntime().exec(new String[] {"su", "-c", helper + " pad"});
             padProc = p;
             padCmd = p.getOutputStream();
             new Thread(() -> {
-                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getErrorStream()))) {
+                try (BufferedReader r = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
                     String l;
                     while ((l = r.readLine()) != null) {
                         Log.i(TAG, "pad: " + l);

@@ -12,6 +12,10 @@
  *   rearhelper serve      frames (W*H*2 bytes each) on stdin are sent to the display;
  *                         the rear touch is grabbed (SystemUI does not see it) and printed
  *                         on stdout as "D x y", "M x y", "U x y" lines. Exits on stdin EOF.
+ *   rearhelper pad        virtual touchscreen (uinput) on the main display: reads "D x y",
+ *                         "M x y", "U x y" (rear coordinates) on stdin, X mirrored because the
+ *                         panel is touched from behind. A real input device, so Android scales
+ *                         it to the screen, follows rotation and draws "show taps". Exits on EOF.
  *   rearhelper on | off   power + backlight
  *   rearhelper bl <0..16>
  *   rearhelper test       colour bars
@@ -20,6 +24,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <linux/input.h>
+#include <linux/uinput.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -111,6 +116,120 @@ static void *touch_thread(void *unused) {
     return NULL;
 }
 
+/* ---- touchpad: virtual touchscreen */
+#define SLOP 6 /* rear pixels a finger may wander before a tap turns into a drag */
+
+static int ui_fd = -1;
+
+static void emit(int type, int code, int value) {
+    struct input_event e;
+    memset(&e, 0, sizeof e);
+    e.type = (unsigned short)type;
+    e.code = (unsigned short)code;
+    e.value = value;
+    if (write(ui_fd, &e, sizeof e) < 0) { /* nothing sensible to do */ }
+}
+
+static void abs_setup(int code, int max) {
+    struct uinput_abs_setup a;
+    memset(&a, 0, sizeof a);
+    a.code = (unsigned short)code;
+    a.absinfo.minimum = 0;
+    a.absinfo.maximum = max;
+    ioctl(ui_fd, UI_ABS_SETUP, &a);
+}
+
+static int ui_create(void) {
+    ui_fd = open("/dev/uinput", O_WRONLY | O_NONBLOCK);
+    if (ui_fd < 0) return -errno;
+    ioctl(ui_fd, UI_SET_EVBIT, EV_KEY);
+    ioctl(ui_fd, UI_SET_KEYBIT, BTN_TOUCH);
+    ioctl(ui_fd, UI_SET_EVBIT, EV_ABS);
+    ioctl(ui_fd, UI_SET_ABSBIT, ABS_X);
+    ioctl(ui_fd, UI_SET_ABSBIT, ABS_Y);
+    ioctl(ui_fd, UI_SET_ABSBIT, ABS_MT_SLOT);
+    ioctl(ui_fd, UI_SET_ABSBIT, ABS_MT_TRACKING_ID);
+    ioctl(ui_fd, UI_SET_ABSBIT, ABS_MT_POSITION_X);
+    ioctl(ui_fd, UI_SET_ABSBIT, ABS_MT_POSITION_Y);
+    ioctl(ui_fd, UI_SET_PROPBIT, INPUT_PROP_DIRECT); /* touchscreen, not a touchpad */
+    abs_setup(ABS_X, W - 1);
+    abs_setup(ABS_Y, H - 1);
+    abs_setup(ABS_MT_SLOT, 0);
+    abs_setup(ABS_MT_TRACKING_ID, 65535);
+    abs_setup(ABS_MT_POSITION_X, W - 1);
+    abs_setup(ABS_MT_POSITION_Y, H - 1);
+    struct uinput_setup u;
+    memset(&u, 0, sizeof u);
+    u.id.bustype = BUS_VIRTUAL; /* not USB/BT: Android treats it as an internal screen */
+    u.id.vendor = 0x5245;
+    u.id.product = 0x4152;
+    u.id.version = 1;
+    snprintf(u.name, sizeof u.name, "rear_touchpad");
+    if (ioctl(ui_fd, UI_DEV_SETUP, &u) < 0) return -errno;
+    if (ioctl(ui_fd, UI_DEV_CREATE) < 0) return -errno;
+    return 0;
+}
+
+static void pad_point(int x, int y) {
+    x = W - 1 - x; /* touched from behind: mirror */
+    if (x < 0) x = 0;
+    if (x > W - 1) x = W - 1;
+    if (y < 0) y = 0;
+    if (y > H - 1) y = H - 1;
+    emit(EV_ABS, ABS_MT_POSITION_X, x);
+    emit(EV_ABS, ABS_MT_POSITION_Y, y);
+    emit(EV_ABS, ABS_X, x);
+    emit(EV_ABS, ABS_Y, y);
+}
+
+static int pad(void) {
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    int r = ui_create();
+    if (r < 0) {
+        printf("E uinput: %s\n", strerror(-r));
+        return 1;
+    }
+    usleep(300000); /* let InputReader pick the device up */
+    printf("I pad ready\n");
+    char line[64];
+    int down = 0, drag = 0, dx = 0, dy = 0, id = 0;
+    while (fgets(line, sizeof line, stdin)) {
+        char c;
+        int x, y;
+        if (sscanf(line, "%c %d %d", &c, &x, &y) != 3) continue;
+        if (c == 'D' || (c == 'M' && !down)) {
+            down = 1;
+            drag = 0;
+            dx = x;
+            dy = y;
+            emit(EV_ABS, ABS_MT_SLOT, 0);
+            emit(EV_ABS, ABS_MT_TRACKING_ID, id++ & 0xffff);
+            pad_point(x, y);
+            emit(EV_KEY, BTN_TOUCH, 1);
+            emit(EV_SYN, SYN_REPORT, 0);
+        } else if (c == 'M') {
+            if (!drag && abs(x - dx) <= SLOP && abs(y - dy) <= SLOP) continue; /* still a tap */
+            drag = 1;
+            pad_point(x, y);
+            emit(EV_SYN, SYN_REPORT, 0);
+        } else if (c == 'U' && down) {
+            if (drag) pad_point(x, y);
+            emit(EV_ABS, ABS_MT_TRACKING_ID, -1);
+            emit(EV_KEY, BTN_TOUCH, 0);
+            emit(EV_SYN, SYN_REPORT, 0);
+            down = 0;
+        }
+    }
+    if (down) {
+        emit(EV_ABS, ABS_MT_TRACKING_ID, -1);
+        emit(EV_KEY, BTN_TOUCH, 0);
+        emit(EV_SYN, SYN_REPORT, 0);
+    }
+    ioctl(ui_fd, UI_DEV_DESTROY);
+    close(ui_fd);
+    return 0;
+}
+
 static int read_full(unsigned char *b, int n) {
     int got = 0;
     while (got < n) {
@@ -164,10 +283,11 @@ static void test(void) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "usage: rearhelper serve|on|off|bl N|test\n");
+        fprintf(stderr, "usage: rearhelper serve|pad|on|off|bl N|test\n");
         return 2;
     }
     if (!strcmp(argv[1], "serve")) return serve();
+    if (!strcmp(argv[1], "pad")) return pad();
     if (!strcmp(argv[1], "on")) { power(1); return 0; }
     if (!strcmp(argv[1], "off")) { power(0); backlight(0); return 0; }
     if (!strcmp(argv[1], "bl") && argc > 2) return backlight(atoi(argv[2])) ? 1 : 0;
