@@ -40,7 +40,7 @@ public class MainActivity extends Activity {
             TEXT = 0xFFF1F2F5, SUB = 0xFF8A90A0, ACCENT = 0xFFFF7A3D, ACCENT_DIM = 0x33FF7A3D, OK = 0xFF4ADE80;
 
     private Prefs prefs;
-    private LinearLayout page, appsBox, appSec, visSec, mediaSec, filesBox, tickSec, qrSec, wifiBox, contactBox, textBox;
+    private LinearLayout page, appsBox, appSec, visSec, mediaSec, filesBox, tickSec, qrSec, padSec, wifiBox, contactBox, textBox;
     private TextView statusText, statusDot, startBtn, previewGlyph;
     private final List<View> modeTiles = new ArrayList<>();
     private final List<Runnable> refreshers = new ArrayList<>();
@@ -78,7 +78,8 @@ public class MainActivity extends Activity {
         LinearLayout tileRow = null;
         String[][] modes = {{"▣", "Медиа", "фото · GIF · видео"}, {"⠿", "Приложения", "иконки сзади"},
                 {"▁▃▆", "Эквалайзер", "звук"}, {"◔", "Монитор", "ЦП · ОЗУ · батарея"},
-                {"≋", "Строка", "бегущий текст"}, {"▦", "QR-код", "Wi-Fi · ссылка"}};
+                {"≋", "Строка", "бегущий текст"}, {"▦", "QR-код", "Wi-Fi · ссылка"},
+                {"☝", "Тачпад", "экран чёрный · касания на основной"}};
         for (int i = 0; i < modes.length; i++) {
             if (i % 2 == 0) {
                 tileRow = new LinearLayout(this);
@@ -104,6 +105,12 @@ public class MainActivity extends Activity {
         // ---- per-mode sections
         appSec = column(); visSec = column(); mediaSec = column(); tickSec = column(); qrSec = column();
         page.addView(appSec); page.addView(visSec); page.addView(mediaSec); page.addView(tickSec); page.addView(qrSec);
+        padSec = column();
+        padSec.addView(hint("Задний экран выключен (подсветка 0). Касания сзади идут на основной экран, "
+                + "зеркально по горизонтали: тап — нажатие, проведи пальцем — скролл. Вся задняя панель "
+                + "соответствует всему основному экрану."));
+        space(padSec, 14);
+        page.addView(padSec);
         buildApps();
         buildVis();
         buildMedia();
@@ -124,12 +131,6 @@ public class MainActivity extends Activity {
         divider(common);
         common.addView(picker("Как включать снова", new String[] {"Никак (экран отдаётся Blackview)",
                 "Одиночный тап сзади", "Двойной тап сзади"}, prefs::wakeMode, i -> prefs.put("wake", i)));
-        divider(common);
-        common.addView(picker("Касания сзади", new String[] {"Только для заднего экрана",
-                "Управляют основным (зеркально)"}, prefs::padMode, i -> {
-            prefs.put("pad", i);
-            live();
-        }));
         divider(common);
         common.addView(slider("Яркость", 15, () -> prefs.brightness() - 1, i -> {
             prefs.put("bl", i + 1);
@@ -363,7 +364,7 @@ public class MainActivity extends Activity {
         startBtn.setText(on ? "Остановить" : "Запустить");
         startBtn.setTextColor(on ? TEXT : Color.WHITE);
         startBtn.setBackground(ripple(on ? round(CARD2, dp(24), LINE, dp(1)) : round(ACCENT, dp(24), 0, 0)));
-        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆", "◔", "≋", "▦"}[Math.min(5, mode)]);
+        previewGlyph.setText(new String[] {"▣", "⠿", "▁▃▆", "◔", "≋", "▦", "☝"}[Math.min(6, mode)]);
         previewGlyph.setTextColor(on ? ACCENT : 0xFF3A3F4A);
         for (int i = 0; i < modeTiles.size(); i++) {
             boolean sel = i == mode;
@@ -374,6 +375,7 @@ public class MainActivity extends Activity {
         mediaSec.setVisibility(mode == Prefs.MODE_MEDIA ? View.VISIBLE : View.GONE);
         tickSec.setVisibility(mode == Prefs.MODE_TICKER ? View.VISIBLE : View.GONE);
         qrSec.setVisibility(mode == Prefs.MODE_QR ? View.VISIBLE : View.GONE);
+        padSec.setVisibility(mode == Prefs.MODE_PAD ? View.VISIBLE : View.GONE);
         int qt = prefs.qrType();
         textBox.setVisibility(qt == 0 ? View.VISIBLE : View.GONE);
         wifiBox.setVisibility(qt == 1 ? View.VISIBLE : View.GONE);

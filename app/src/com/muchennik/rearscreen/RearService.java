@@ -89,7 +89,7 @@ public class RearService extends Service {
                 wake();
             }
         } else if (ACTION_BRIGHTNESS.equals(a)) {
-            if (running && awake) backlight(prefs.brightness());
+            if (running && awake && prefs.mode() != Prefs.MODE_PAD) backlight(prefs.brightness());
         } else if (!running) {
             begin();
         }
@@ -212,6 +212,9 @@ public class RearService extends Service {
         } else if (m == Prefs.MODE_STATS) {
             renderThread = new Thread(this::statsLoop, "rear-stats");
             renderThread.start();
+        } else if (m == Prefs.MODE_PAD) {
+            renderThread = new Thread(this::padLoop, "rear-pad");
+            renderThread.start();
         } else if (m == Prefs.MODE_VIS) {
             renderThread = new Thread(this::visLoop, "rear-vis");
             renderThread.start();
@@ -244,6 +247,7 @@ public class RearService extends Service {
                     index = 0;
                     wake();
                     startMode();
+                    updatePad();
                 } catch (Exception e) {
                     Log.e(TAG, "switch", e);
                     toast("Задний экран: " + e.getMessage());
@@ -340,6 +344,18 @@ public class RearService extends Service {
     }
 
     /** System monitor: one frame per second. */
+    /** Touchpad mode: one black frame, backlight stays 0; the helper keeps reading the touch. */
+    private void padLoop() {
+        final int g = gen;
+        try {
+            writeFrame(new byte[Frames.SIZE]);
+            backlight(0);
+            while (running && g == gen) Thread.sleep(500);
+        } catch (Exception e) {
+            if (running) Log.e(TAG, "pad loop", e);
+        }
+    }
+
     private void statsLoop() {
         byte[] frame = new byte[Frames.SIZE];
         byte[] black = new byte[Frames.SIZE];
@@ -405,7 +421,7 @@ public class RearService extends Service {
         awakeSince = SystemClock.uptimeMillis();
         slideSince = awakeSince;
         String h = helper;
-        int bl = prefs.brightness();
+        int bl = prefs.mode() == Prefs.MODE_PAD ? 0 : prefs.brightness(); // touchpad: stays dark
         // panel on (display on + sleep out) before the backlight, every time we wake up
         if (h != null) new Thread(() -> Root.run(h + " on && " + h + " bl " + bl)).start();
         if (wl != null && !wl.isHeld()) wl.acquire();
@@ -611,9 +627,9 @@ public class RearService extends Service {
         }
     }
 
-    /** Rear touch drives the main screen (setting "Касания сзади"); not in app mode. */
+    /** Touchpad mode: rear panel dark, its touches drive the main screen. */
     private synchronized void updatePad() {
-        boolean want = running && prefs.padMode() == Prefs.PAD_MAIN && prefs.mode() != Prefs.MODE_APP;
+        boolean want = running && prefs.mode() == Prefs.MODE_PAD;
         if (want == (padProc != null)) return;
         if (!want) { stopPad(); return; }
         try {
@@ -716,6 +732,8 @@ public class RearService extends Service {
             b.setContentText("Бегущая строка");
         } else if (new Prefs(this).mode() == Prefs.MODE_QR) {
             b.setContentText("QR-код");
+        } else if (new Prefs(this).mode() == Prefs.MODE_PAD) {
+            b.setContentText("Тачпад: экран сзади выключен, касания идут на основной");
         } else if (new Prefs(this).mode() == Prefs.MODE_STATS) {
             b.setContentText("Монитор системы");
         }

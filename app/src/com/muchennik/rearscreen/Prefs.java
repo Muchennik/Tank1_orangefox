@@ -41,7 +41,7 @@ final class Prefs {
     boolean running() { return sp.getBoolean("running", false); }
 
     /** what the rear screen shows */
-    static final int MODE_MEDIA = 0, MODE_APP = 1, MODE_VIS = 2, MODE_STATS = 3, MODE_TICKER = 4, MODE_QR = 5;
+    static final int MODE_MEDIA = 0, MODE_APP = 1, MODE_VIS = 2, MODE_STATS = 3, MODE_TICKER = 4, MODE_QR = 5, MODE_PAD = 6;
     int mode() { return sp.getInt("mode", MODE_MEDIA); }
     String appPackage() { return sp.getString("app_pkg", "com.android.chrome"); }
     String appLabel() { return sp.getString("app_label", "Chrome"); }
@@ -58,9 +58,6 @@ final class Prefs {
         return l;
     }
     void setApps(List<String> l) { sp.edit().putString("apps", String.join("\n", l)).apply(); }
-    /** what rear touches do outside app mode */
-    static final int PAD_OFF = 0, PAD_MAIN = 1;
-    int padMode() { return sp.getInt("pad", PAD_OFF); }
     /** own keyboard on the rear screen (else the normal one opens on the main screen) */
     boolean rearKeyboard() { return sp.getBoolean("kbd_rear", true); }
 
